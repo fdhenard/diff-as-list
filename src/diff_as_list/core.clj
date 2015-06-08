@@ -39,9 +39,9 @@
 ;;    [:agents :orders :vendors] #(:id %)
 ;;    [:agents :orders :vendors :orderrows] #(str (:id %) "-refund=" (:is-refund %))})
 
-(defn mydiff
-  ([arg-1 arg-2] (mydiff arg-1 arg-2 nil [] []))
-  ([arg-1 arg-2 depth-ident-funcs] (mydiff arg-1 arg-2 depth-ident-funcs [] []))
+(defn diffl
+  ([arg-1 arg-2] (diffl arg-1 arg-2 nil [] []))
+  ([arg-1 arg-2 depth-ident-funcs] (diffl arg-1 arg-2 depth-ident-funcs [] []))
   ([arg-1 arg-2 depth-ident-funcs keypath keypath-w-id]
    ;; (pp/pprint {:arg-1 arg-1
    ;;             :arg-2 arg-2
@@ -75,7 +75,7 @@
                                      ]
                                     [])]
            (flatten (into initial-difference
-                          (map #(mydiff (% arg-1) (% arg-2) depth-ident-funcs (conj keypath %) (conj keypath-w-id %)) keys-in-both))))
+                          (map #(diffl (% arg-1) (% arg-2) depth-ident-funcs (conj keypath %) (conj keypath-w-id %)) keys-in-both))))
          (is-primitive? arg-1)
          (if (not (= arg-1 arg-2))
            (do
@@ -98,14 +98,14 @@
                        matches-for-2 (map #(find-match % arg-1 ident-func) arg-2)
                        unmatched-for-2 (map (fn [[x y]] [y x]) (filter #(nil? (second %)) matches-for-2))
                        matches (concat matches-for-1 unmatched-for-2)]
-                   (flatten (map (fn [[a b]] (mydiff a b depth-ident-funcs keypath (conj keypath-w-id (ident-func a)))) matches))
+                   (flatten (map (fn [[a b]] (diffl a b depth-ident-funcs keypath (conj keypath-w-id (ident-func a)))) matches))
                    )))))
          :else
          (throw (Exception. (str "don't know how to handle type " (.getName (type arg-1)))))
          )))))
 
 ;; (defn- compare-test-1 []
-;;   (mydiff (cd-xml-to-map "compare-test-1.xml") (cd-xml-to-map "compare-test-2.xml") depth-ident-funcs-new))
+;;   (diffl (cd-xml-to-map "compare-test-1.xml") (cd-xml-to-map "compare-test-2.xml") depth-ident-funcs-new))
 
 (defn- map-is-same? [map1 map2]
   (let [the-diff (diff map1 map2)]
@@ -116,7 +116,7 @@
                        :keypath-w-id [:what]
                        :value-1 "nothing"
                        :value-2 "who"}
-        actual (mydiff {:what "nothing"} {:what "who"})]
+        actual (diffl {:what "nothing"} {:what "who"})]
     (is (= (count actual) 1))
     (is (map-is-same? expected-diff (first actual))))
   )
@@ -126,7 +126,7 @@
                        :keypath-w-id [:what]
                        :value-1 nil
                        :value-2 {:who "why"}}
-        actual (mydiff {:what nil} {:what {:who "why"}})]
+        actual (diffl {:what nil} {:what {:who "why"}})]
     (is (= (count actual) 1))
     (is (map-is-same? expected-diff (first actual)))
     ;;(pp/pprint actual)
@@ -138,7 +138,7 @@
                 :two 2}]
         val-2 [{:one 2
                 :two 3}]
-        actual (mydiff val-1 val-2 {[] #(:one %)})]
+        actual (diffl val-1 val-2 {[] #(:one %)})]
     ;; (pp/pprint actual)
     (is (= 2 (count actual)))
     (let [in-1 (filter #(not (nil? (:value-1 %))) actual)
@@ -155,7 +155,7 @@
         :keypath-w-id [:what :who]
         :value-1 "one"
         :value-2 "two"}
-       (first (mydiff {:what {:who "one"}} {:what {:who "two"}}))
+       (first (diffl {:what {:who "one"}} {:what {:who "two"}}))
        )))
 
 (deftest my-diff-with-vectors
@@ -168,7 +168,7 @@
                        :value-1 "three"
                        :value-2 "four"}]
     (is (map-is-same? expected-diff
-                      (first (mydiff val-1 val-2 {[] #(:two %)}))))))
+                      (first (diffl val-1 val-2 {[] #(:two %)}))))))
 
 (defn- get-map-from-seq [coll ident-func]
   (first (filter ident-func coll)))
