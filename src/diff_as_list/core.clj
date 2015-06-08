@@ -33,33 +33,11 @@
         (recur (rest unmatched))
         ))))
 
-;; (comment (def depth-ident-funcs
-;;    {1 #(-> % (:attrs) (:AOC-ORDER-ID))
-;;     3 #(:tag %)
-;;     5 #(first %)
-;;     7 #(first %)
-;;     9 #(:tag %)
-;;     11 #(first %)}))
-;; (comment (def depth-ident-funcs-old
-;;            {[:content
-;;              :vector-at-depth-1
-;;              :content
-;;              :vector-at-depth-3
-;;              :content
-;;              :vector-at-depth-5
-;;              :content
-;;              :vector-at-depth-7
-;;              :content
-;;              :vector-at-depth-9
-;;              :content
-;;              :vector-at-depth-11] #(first %)
-;;              }))
-
-(def depth-ident-funcs-new
-  {[:agents] #(:state-agent-code %)
-   [:agents :orders] #(:id %)
-   [:agents :orders :vendors] #(:id %)
-   [:agents :orders :vendors :orderrows] #(str (:id %) "-refund=" (:is-refund %))})
+;; (def depth-ident-funcs-new
+;;   {[:agents] #(:state-agent-code %)
+;;    [:agents :orders] #(:id %)
+;;    [:agents :orders :vendors] #(:id %)
+;;    [:agents :orders :vendors :orderrows] #(str (:id %) "-refund=" (:is-refund %))})
 
 (defn mydiff
   ([arg-1 arg-2] (mydiff arg-1 arg-2 nil [] []))
