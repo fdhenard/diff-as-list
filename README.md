@@ -10,7 +10,7 @@ Compare clojure data structures. The differences come back as a list with paths 
 
     (diffl obj1 obj2)
 
-An essential feature to diffl is to be able compare maps inside sequences.  To make this possible you will need to tell diffl how to determine uniqueness for each map in the list (how to find it's identifier).  That way diffl will know how to find it's match in the other object's list.
+An essential feature to diffl is to be able compare maps inside sequences.  To make this possible you will need to tell diffl how to determine uniqueness for each map in the vector (how to find each map's identifier).  That way diffl will know how to find it's match in the other object's vector.
 
 ### Nested list example
 
