@@ -47,7 +47,7 @@
          :value-2 arg-2}])
      (let [arg-1-type (.getName (type arg-1))
            arg-2-type (.getName (type arg-2))]
-       (if (not (= arg-1-type arg-2-type))
+       (when (not (= arg-1-type arg-2-type))
          [{:keypath keypath
            :keypath-w-id keypath-w-id
            :typediff {:arg-1-type arg-1-type :arg-2-type arg-2-type}}])
@@ -88,8 +88,7 @@
                        matches-for-2 (map #(find-match % arg-1 ident-func) arg-2)
                        unmatched-for-2 (map (fn [[x y]] [y x]) (filter #(nil? (second %)) matches-for-2))
                        matches (concat matches-for-1 unmatched-for-2)]
-                   (flatten (map (fn [[a b]] (diffl a b depth-ident-funcs keypath (conj keypath-w-id (ident-func a)))) matches))
-                   )))))
+                   (flatten (map (fn [[a b]] (diffl a b depth-ident-funcs keypath (conj keypath-w-id (ident-func a)))) matches)))))))
          :else
          (throw (Exception. (str "don't know how to handle type " (.getName (type arg-1))))))))))
 
@@ -104,8 +103,7 @@
                        :value-2 "who"}
         actual (diffl {:what "nothing"} {:what "who"})]
     (is (= (count actual) 1))
-    (is (map-is-same? expected-diff (first actual))))
-  )
+    (is (map-is-same? expected-diff (first actual)))))
 
 (deftest nil-arg
   (let [expected-diff {:keypath [:what]
@@ -116,8 +114,7 @@
     (is (= (count actual) 1))
     (is (map-is-same? expected-diff (first actual)))
     ;;(pp/pprint actual)
-    )
-  )
+    ))
 
 (deftest in-neither
   (let [val-1 [{:one 1
@@ -132,8 +129,7 @@
       (is (= 1 (count in-1)))
       (is (= 1 (count in-2)))
       (is (map-is-same? (-> in-1 first :value-1) (first val-1)))
-      (is (map-is-same? (-> in-2 first :value-2) (first val-2))))
-    ))
+      (is (map-is-same? (-> in-2 first :value-2) (first val-2))))))
 
 (deftest deeper
   (is (map-is-same?
@@ -141,8 +137,7 @@
         :keypath-w-id [:what :who]
         :value-1 "one"
         :value-2 "two"}
-       (first (diffl {:what {:who "one"}} {:what {:who "two"}}))
-       )))
+       (first (diffl {:what {:who "one"}} {:what {:who "two"}})))))
 
 (deftest my-diff-with-vectors
   (let [val-1 [{:two 2
@@ -181,8 +176,7 @@
        (map? obj)
        (recur ((first keypath) obj) (take-last (- (count keypath) 1) keypath) (+ depth 1))
        (sequential? obj)
-       (recur (first (filter (first keypath) obj)) (take-last (- (count keypath) 1) keypath) (+ depth 1))
-       ))))
+       (recur (first (filter (first keypath) obj)) (take-last (- (count keypath) 1) keypath) (+ depth 1))))))
 
 (deftest test-my-get-in
   (let [expected "two"]
