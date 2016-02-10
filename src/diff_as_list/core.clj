@@ -6,11 +6,8 @@
             [clojure.data :refer [diff]]
             [clojure.zip :as zip]))
 
-(defn- is-in? [val coll]
-  (not (nil? (some #{val} coll))))
-
 (defn- is-primitive? [val]
-  (is-in? (.getName (type val)) '("java.lang.String" "java.lang.Long" "clojure.lang.Keyword")))
+  (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword"} (.getName (type val))))
 
 (deftest primitive
   (is (= true (is-primitive? "test")))
