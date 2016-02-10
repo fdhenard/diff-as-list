@@ -10,9 +10,7 @@
   (not (nil? (some #{val} coll))))
 
 (defn- is-primitive? [val]
-  (is-in? (.getName (type val)) '("java.lang.String" "java.lang.Long" "clojure.lang.Keyword"))
-  ;;(not (nil? (some #{(.getName (type val))} '("java.lang.String" "java.lang.Long"))))
-  )
+  (is-in? (.getName (type val)) '("java.lang.String" "java.lang.Long" "clojure.lang.Keyword")))
 
 (deftest primitive
   (is (= true (is-primitive? "test")))
@@ -32,12 +30,6 @@
         [obj (first unmatched)]
         (recur (rest unmatched))
         ))))
-
-;; (def depth-ident-funcs-new
-;;   {[:agents] #(:state-agent-code %)
-;;    [:agents :orders] #(:id %)
-;;    [:agents :orders :vendors] #(:id %)
-;;    [:agents :orders :vendors :orderrows] #(str (:id %) "-refund=" (:is-refund %))})
 
 (defn diffl
   ([arg-1 arg-2] (diffl arg-1 arg-2 nil [] []))
@@ -86,9 +78,7 @@
                :value-2 arg-2}])
            [])
          (sequential? arg-1)
-         (let [depth (count keypath)
-               ;;vector-key (keyword (str "vector-at-depth-" depth))
-               ]
+         (let [depth (count keypath)]
            (if (nil? depth-ident-funcs)
              (throw (Exception. (format "Encountered a vector at depth %s, but an empty depth-ident func. keypath = %s" depth keypath)))
              (let [ident-func (get depth-ident-funcs keypath)]
@@ -101,11 +91,7 @@
                    (flatten (map (fn [[a b]] (diffl a b depth-ident-funcs keypath (conj keypath-w-id (ident-func a)))) matches))
                    )))))
          :else
-         (throw (Exception. (str "don't know how to handle type " (.getName (type arg-1)))))
-         )))))
-
-;; (defn- compare-test-1 []
-;;   (diffl (cd-xml-to-map "compare-test-1.xml") (cd-xml-to-map "compare-test-2.xml") depth-ident-funcs-new))
+         (throw (Exception. (str "don't know how to handle type " (.getName (type arg-1))))))))))
 
 (defn- map-is-same? [map1 map2]
   (let [the-diff (diff map1 map2)]
