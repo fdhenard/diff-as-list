@@ -1,6 +1,7 @@
 (ns diff-as-list.attempt-2
   (:require [clojure.test :as test]
-            [clojure.set :as _set]))
+            [clojure.set :as _set]
+            [clojure.pprint :as pp]))
 
 (defn- is-primitive? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword"} (.getName (type val))))
@@ -12,76 +13,95 @@
 ;;   (is (not (is-primitive? []))))
 
 
-(defn diffl
-  ([arg-1 arg-2] (diffl arg-1 arg-2 [] [] []))
-  ([arg-1 arg-2 keypath keys-to-traverse result]
-   (if (or (nil? arg-1) (nil? arg-2))
-     (if (and (nil? arg-1) (nil? arg-2))
-       result
-       (conj result {:keypath keypath
-                     :value-1 arg-1
-                     :value-2 arg-2}))
-     (let [arg-1-type (.getName (type arg-1))
-           arg-2-type (.getName (type arg-2))]
-       (if-not (= arg-1-type arg-2-type)
-         (conj result {:keypath keypath
-                       :typediff {:arg-1-type arg-1-type
-                                  :arg-2-type arg-2-type}})
-         (cond
-           (is-primitive? arg-1)
-           (if (= arg-1 arg-2)
-             result
-             (conj result {:keypath keypath
-                           :value-1 arg-1
-                           :value-2 arg-2}))
-           (map? arg-1)
-           (if (> (count keys-to-traverse) 0)
-             (let [next-key (first keys-to-traverse)]
-               (recur (get arg-1 next-key)
-                      (get arg-2 next-key)
-                      (conj keypath next-key)
-                      (rest keys-to-traverse)
-                      result))
-             (let [keys-in-1 (set (keys arg-1))
-                   keys-in-2 (set (keys arg-2))
-                   keys-missing-in-2 (_set/difference keys-in-1 keys-in-2)
-                   keys-missing-in-1 (_set/difference keys-in-2 keys-in-1)
-                   keys-in-both (_set/intersection keys-in-1 keys-in-2)
-                   new-result (if (and (= 0 (count keys-missing-in-1))
-                                       (= 0 (count keys-missing-in-2)))
-                                result
-                                (conj result {:keypath keypath
-                                              :keys-missing-in-1 keys-missing-in-1
-                                              :keys-missing-in-2 keys-missing-in-2}))]
-               (recur arg-1 arg-2 keypath keys-in-both new-result)))
-           :else
-           (throw (Exception. (str "don't know how to handle type " (.getName (type arg-1)))))))))))
+(defn traverse-to-flat
+  ([in-val] (traverse-to-flat in-val [] [] {}))
+  ([in-val remaining-traversal in-path result]
+   ;; (pp/pprint {;; :in-val in-val
+   ;;             :remaining-traversal remaining-traversal
+   ;;             :in-path in-path
+   ;;             :result result})
+   (if (nil? in-path)
+     result
+     (let [value (get-in in-val in-path ::no-value)]
+       (cond
+         (or (nil? value) (is-primitive? value))
+         (do
+           ;; below conjes result into a vector
+           ;; (recur in-val (rest remaining-traversal) (first remaining-traversal) (conj result {:path in-path :value value}))
+           ;; below assoces result into a map
+           (recur in-val
+                  (rest remaining-traversal)
+                  (first remaining-traversal)
+                  (assoc result in-path {:type ::primitive :value value}))
+           )
+         (map? value)
+         (let [_keys (keys value)
+               first-key (first _keys)
+               rest-keys (rest _keys)
+               remain-trvrs-to-add (map #(conj in-path %) rest-keys)]
+           ;; (pp/pprint {:remaining-traversal remaining-traversal
+           ;;             :remain-trvrs-to-add remain-trvrs-to-add})
+           (recur in-val
+                  (concat remaining-traversal remain-trvrs-to-add)
+                  (conj in-path first-key)
+                  (assoc result in-path {:type ::map})))
+         :else
+         (throw (Exception. "don't know how to handle type " (.getName (type value)))))))
+   ))
 
 
-(test/deftest easy
-  (test/is (= [] (diffl 1 1)))
-  (test/is (= [] (diffl nil nil)))
-  (test/is (= [{:keypath [], :value-1 nil, :value-2 1}] (diffl nil 1)))
-  (test/is (= [{:keypath [], :value-1 1, :value-2 nil}] (diffl 1 nil)))
-  (test/is (= [{:keypath [], :value-1 1, :value-2 2}] (diffl 1 2))))
-
-(test/deftest nesting
-  (test/is (= [] (diffl {:one 1} {:one 1})))
-  (test/is (= [{:keypath [:one], :value-1 1, :value-2 2}] (diffl {:one 1} {:one 2})))
-  (let [result (diffl {:one {:two {:three 4}}} {:one {:two {:three 5}}})]
-    (test/is (= [{:keypath [:one :two :three], :value-1 4, :value-2 5}] result ))))
+(println "\n\n---- new compile ----")
 
 
-(test/deftest keys-missing
-  (let [result (diffl {:one 1 :two 2} {:one 1})]
-    (test/is (= [{:keypath [], :keys-missing-in-1 #{}, :keys-missing-in-2 #{:two}}] result))))
+(def test-map {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+                                       :level-3-2 {:level-4-1 "level-4-1-val"}}
+                           :level-2-2 "level-2-2-val"
+                           :level-2-3 "level-2-3-val"}
+               :level-1-2 "level-1-2-val"})
+
+(println "\ntest-map")
+(pp/pprint test-map)
+(def test-map-flattened (traverse-to-flat test-map))
+(println "\ntest-map-flattened")
+(pp/pprint test-map-flattened)
+
+(def test-map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+                                         ;; :level-3-2 nil
+                                         }
+                             :level-2-2 "level-2-2-val"
+                             :level-2-3 "level-2-3-val"}
+                 :level-1-2 "level-1-2-val"})
+
+(println "\ntest-map-2")
+(pp/pprint test-map-2)
+(def test-map-2-flattened (traverse-to-flat test-map-2))
+(println "\ntest-map-2-flattened")
+(pp/pprint test-map-2-flattened)
 
 
+;; (def diffed (clojure.data/diff test-map test-map-2))
 
+;; (println "\ndiffed")
+;; (pp/pprint diffed)
 
-;; F. Henard 5/19/18 - stopped here - this is hard
-(test/deftest keys-missing-multiple
-  (let [expected [{:keypath [:one], :value-1 1, :value-2 2}
-                  {:keypath [:two], :value-1 3, :value-2 4}]
-        result (diffl {:one 1 :two 2} {:one 3 :two 4})]
-    (test/is (= expected result))))
+(defn diffl [arg-1 arg-2]
+  (let [flattened-1 (traverse-to-flat arg-1)
+        flattened-2 (traverse-to-flat arg-2)
+        keys-in-1 (set (keys flattened-1))
+        keys-in-2 (set (keys flattened-2))
+        keys-missing-in-2 (_set/difference keys-in-1 keys-in-2)
+        keys-missing-in-1 (_set/difference keys-in-2 keys-in-1)
+        keys-in-both (_set/intersection keys-in-1 keys-in-2)
+        keys-in-both-compare (fn [_key]
+                               (let [value-1 (get-in arg-1 _key ::not-found)
+                                     value-2 (get-in arg-2 _key ::not-found)]
+                                 (when (not (= value-1 value-2))
+                                   {:path _key :val-1 value-1 :val-2 value-2})))]
+    {:keys-missing-in-1 keys-missing-in-1
+     :keys-missing-in-2 keys-missing-in-2
+     :value-differences (remove nil? (map #(keys-in-both-compare %) keys-in-both))}
+    ))
+
+(def diffl-val (diffl test-map test-map-2))
+(println "\ndiffl-val")
+(pp/pprint diffl-val)
