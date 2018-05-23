@@ -112,16 +112,16 @@
                                    {:path _key :val-1 value-1 :val-2 value-2})))
         value-diffs (remove nil? (map #(keys-in-both-compare %) keys-in-both))
         value-diff-paths (map :path value-diffs)
-        is-missing-in-value-diff? (fn [diff-path missing-path]
-                                    (let [diff-path-length (count diff-path)
-                                          missing-path-length (count missing-path)]
-                                      (if (< missing-path-length diff-path-length)
+        is-path-parent-of-other-path? (fn [path-1 path-2]
+                                    (let [path-1-length (count path-1)
+                                          path-2-length (count path-2)]
+                                      (if (< path-2-length path-1-length)
                                         false
-                                        (let [missing-sub-path (take diff-path-length missing-path)]
-                                          (= diff-path missing-sub-path)))))
+                                        (let [path-2-shortened (take path-1-length path-2)]
+                                          (= path-1 path-2-shortened)))))
         ;; is-missing-key-in-diffs? #(contains? value-diff-path-set %)
         is-missing-path-in-diffs? (fn [missing-path]
-                                   (some #(is-missing-in-value-diff? % missing-path) value-diff-paths))
+                                    (some #(is-path-parent-of-other-path? % missing-path) value-diff-paths))
         keys-missing-in-2 (as-> (_set/difference keys-in-1 keys-in-2) $
                             (remove is-missing-path-in-diffs? $))
         keys-missing-in-1 (as-> (_set/difference keys-in-2 keys-in-1) $
