@@ -44,7 +44,9 @@
            (recur in-val
                   (concat remaining-traversal remain-trvrs-to-add)
                   (conj in-path first-key)
-                  (assoc result in-path {:type ::map})))
+                  (assoc result in-path {:type ::map})
+                  ;; result
+                  ))
          :else
          (throw (Exception. "don't know how to handle type " (.getName (type value)))))))
    ))
@@ -66,7 +68,7 @@
 (pp/pprint test-map-flattened)
 
 (def test-map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
-                                         ;; :level-3-2 nil
+                                         :level-3-2 nil
                                          }
                              :level-2-2 "level-2-2-val"
                              :level-2-3 "level-2-3-val"}
@@ -94,8 +96,21 @@
         keys-in-both (_set/intersection keys-in-1 keys-in-2)
         keys-in-both-compare (fn [_key]
                                (let [value-1 (get-in arg-1 _key ::not-found)
-                                     value-2 (get-in arg-2 _key ::not-found)]
-                                 (when (not (= value-1 value-2))
+                                     val-1-map-or-prim (as-> flattened-1 $
+                                                          (get $ _key)
+                                                          (:type $))
+                                     value-2 (get-in arg-2 _key ::not-found)
+                                     val-2-map-or-prim (as-> flattened-2 $
+                                                          (get $ _key)
+                                                          (:type $))
+                                     both-are-maps? (and (= ::map val-1-map-or-prim)
+                                                         (= ::map val-2-map-or-prim))
+                                     both-are-prims? (and (= ::primitive val-1-map-or-prim)
+                                                          (= ::primitive val-2-map-or-prim))
+                                     ]
+                                 (when-not (or both-are-maps?
+                                               (and both-are-prims?
+                                                    (= value-1 value-2)))
                                    {:path _key :val-1 value-1 :val-2 value-2})))]
     {:keys-missing-in-1 keys-missing-in-1
      :keys-missing-in-2 keys-missing-in-2
