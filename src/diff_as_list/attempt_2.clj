@@ -68,7 +68,7 @@
 (pp/pprint test-map-flattened)
 
 (def test-map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
-                                         :level-3-2 nil
+                                         ;; :level-3-2 nil
                                          }
                              :level-2-2 "level-2-2-val"
                              :level-2-3 "level-2-3-val"}
@@ -91,8 +91,6 @@
         flattened-2 (traverse-to-flat arg-2)
         keys-in-1 (set (keys flattened-1))
         keys-in-2 (set (keys flattened-2))
-        keys-missing-in-2 (_set/difference keys-in-1 keys-in-2)
-        keys-missing-in-1 (_set/difference keys-in-2 keys-in-1)
         keys-in-both (_set/intersection keys-in-1 keys-in-2)
         keys-in-both-compare (fn [_key]
                                (let [value-1 (get-in arg-1 _key ::not-found)
@@ -111,10 +109,28 @@
                                  (when-not (or both-are-maps?
                                                (and both-are-prims?
                                                     (= value-1 value-2)))
-                                   {:path _key :val-1 value-1 :val-2 value-2})))]
+                                   {:path _key :val-1 value-1 :val-2 value-2})))
+        value-diffs (remove nil? (map #(keys-in-both-compare %) keys-in-both))
+        value-diff-paths (map :path value-diffs)
+        is-missing-in-value-diff? (fn [diff-path missing-path]
+                                    (let [diff-path-length (count diff-path)
+                                          missing-path-length (count missing-path)]
+                                      (if (< missing-path-length diff-path-length)
+                                        false
+                                        (let [missing-sub-path (take diff-path-length missing-path)]
+                                          (= diff-path missing-sub-path)))))
+        ;; is-missing-key-in-diffs? #(contains? value-diff-path-set %)
+        is-missing-path-in-diffs? (fn [missing-path]
+                                   (some #(is-missing-in-value-diff? % missing-path) value-diff-paths))
+        keys-missing-in-2 (as-> (_set/difference keys-in-1 keys-in-2) $
+                            (remove is-missing-path-in-diffs? $))
+        keys-missing-in-1 (as-> (_set/difference keys-in-2 keys-in-1) $
+                            (remove is-missing-path-in-diffs? $))
+        
+        ]
     {:keys-missing-in-1 keys-missing-in-1
      :keys-missing-in-2 keys-missing-in-2
-     :value-differences (remove nil? (map #(keys-in-both-compare %) keys-in-both))}
+     :value-differences value-diffs}
     ))
 
 (def diffl-val (diffl test-map test-map-2))
