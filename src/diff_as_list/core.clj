@@ -1,197 +1,177 @@
 (ns diff-as-list.core
-  (:require [clojure.xml :as xml]
-            [clojure.pprint :as pp]
-            [clojure.test :refer :all]
+  (:require [clojure.test :as test]
             [clojure.set :as _set]
+            [clojure.pprint :as pp]
             [clojure.data :refer [diff]]
-            [clojure.zip :as zip]))
+            [clojure.test :as test]))
 
 (defn- is-primitive? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword"} (.getName (type val))))
 
-(deftest primitive
-  (is (= true (is-primitive? "test")))
-  (is (is-primitive? 1))
-  (is (not (is-primitive? {})))
-  (is (not (is-primitive? []))))
+(test/deftest primitive
+  (test/is (= true (is-primitive? "test")))
+  (test/is (is-primitive? 1))
+  (test/is (not (is-primitive? {})))
+  (test/is (not (is-primitive? []))))
 
-(defn- is-func? [obj]
-  (= (.getName (type obj)) "clojure.lang.Fn"))
 
-(defn- find-match [obj coll ident-func]
-  (loop
-      [unmatched coll]
-    (if (empty? unmatched)
-      [obj nil]
-      (if (= (ident-func obj) (ident-func (first unmatched)))
-        [obj (first unmatched)]
-        (recur (rest unmatched))
-        ))))
-
-(defn diffl
-  ([arg-1 arg-2] (diffl arg-1 arg-2 nil [] []))
-  ([arg-1 arg-2 depth-ident-funcs] (diffl arg-1 arg-2 depth-ident-funcs [] []))
-  ([arg-1 arg-2 depth-ident-funcs keypath keypath-w-id]
-   ;; (pp/pprint {:arg-1 arg-1
-   ;;             :arg-2 arg-2
-   ;;             :keypath keypath})
-   (if (or (nil? arg-1) (nil? arg-2))
-     (if (and (nil? arg-1) (nil? arg-2))
-       []
-       [{:keypath keypath
-         :keypath-w-id keypath-w-id
-         :value-1 arg-1
-         :value-2 arg-2}])
-     (let [arg-1-type (.getName (type arg-1))
-           arg-2-type (.getName (type arg-2))]
-       (when (not (= arg-1-type arg-2-type))
-         [{:keypath keypath
-           :keypath-w-id keypath-w-id
-           :typediff {:arg-1-type arg-1-type :arg-2-type arg-2-type}}])
+(defn traverse-to-flat
+  ([in-val] (traverse-to-flat in-val [] [] {}))
+  ([in-val remaining-traversal in-path result]
+   ;; (pp/pprint {;; :in-val in-val
+   ;;             :remaining-traversal remaining-traversal
+   ;;             :in-path in-path
+   ;;             :result result})
+   (if (nil? in-path)
+     result
+     (let [value (get-in in-val in-path ::no-value)]
        (cond
-         (map? arg-1)
-         (let [keys-in-1 (set (keys arg-1))
-               keys-in-2 (set (keys arg-2))
-               keys-missing-in-2 (_set/difference keys-in-1 keys-in-2)
-               keys-missing-in-1 (_set/difference keys-in-2 keys-in-1)
-               keys-in-both (_set/intersection keys-in-1 keys-in-2)
-               initial-difference (if (or (> (count keys-missing-in-1) 0)
-                                          (> (count keys-missing-in-2) 0))
-                                    [{:keypath keypath
-                                      :keypath-w-id keypath-w-id
-                                      :keys-missing-in-1 keys-missing-in-1
-                                      :keys-missing-in-2 keys-missing-in-2}
-                                     ]
-                                    [])]
-           (flatten (into initial-difference
-                          (map #(diffl (% arg-1) (% arg-2) depth-ident-funcs (conj keypath %) (conj keypath-w-id %)) keys-in-both))))
-         (is-primitive? arg-1)
-         (if (not (= arg-1 arg-2))
-           (do
-             ;; (println (format "diff found at %s: 1 = %s; 2 = %s" keypath arg-1 arg-2))
-             [{:keypath keypath
-               :keypath-w-id keypath-w-id
-               :value-1 arg-1
-               :value-2 arg-2}])
-           [])
-         (sequential? arg-1)
-         (let [depth (count keypath)]
-           (if (nil? depth-ident-funcs)
-             (throw (Exception. (format "Encountered a vector at depth %s, but an empty depth-ident func. keypath = %s" depth keypath)))
-             (let [ident-func (get depth-ident-funcs keypath)]
-               (if (nil? ident-func)
-                 (throw (Exception. (format "Could not find a depth-ident func for depth %s; keypath = %s" depth keypath)))
-                 (let [matches-for-1 (map #(find-match % arg-2 ident-func) arg-1)
-                       matches-for-2 (map #(find-match % arg-1 ident-func) arg-2)
-                       unmatched-for-2 (map (fn [[x y]] [y x]) (filter #(nil? (second %)) matches-for-2))
-                       matches (concat matches-for-1 unmatched-for-2)]
-                   (flatten (map (fn [[a b]] (diffl a b depth-ident-funcs keypath (conj keypath-w-id (ident-func a)))) matches)))))))
+         (or (nil? value) (is-primitive? value))
+         (do
+           ;; below assoces result into a map
+           (recur in-val
+                  (rest remaining-traversal)
+                  (first remaining-traversal)
+                  (assoc result in-path {:type ::primitive :value value})))
+         (map? value)
+         (let [_keys (keys value)
+               first-key (first _keys)
+               rest-keys (rest _keys)
+               remain-trvrs-to-add (map #(conj in-path %) rest-keys)]
+           ;; (pp/pprint {:remaining-traversal remaining-traversal
+           ;;             :remain-trvrs-to-add remain-trvrs-to-add})
+           (recur in-val
+                  (concat remaining-traversal remain-trvrs-to-add)
+                  (conj in-path first-key)
+                  (assoc result in-path {:type ::map})))
          :else
-         (throw (Exception. (str "don't know how to handle type " (.getName (type arg-1))))))))))
+         (throw (Exception. "don't know how to handle type " (.getName (type value)))))))))
+
+
+;; (println "\n\n---- new compile ----")
+
+
+;; (def test-map {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+;;                                        :level-3-2 {:level-4-1 "level-4-1-val"}}
+;;                            :level-2-2 "level-2-2-val"
+;;                            :level-2-3 "level-2-3-val"}
+;;                :level-1-2 "level-1-2-val"})
+
+;; (println "\ntest-map")
+;; (pp/pprint test-map)
+;; (def test-map-flattened (traverse-to-flat test-map))
+;; (println "\ntest-map-flattened")
+;; (pp/pprint test-map-flattened)
+
+;; (def test-map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+;;                                          :level-3-2 nil
+;;                                          }
+;;                              :level-2-2 "level-2-2-val"
+;;                              :level-2-3 "level-2-3-val"}
+;;                  :level-1-2 "level-1-2-val"})
+
+;; (println "\ntest-map-2")
+;; (pp/pprint test-map-2)
+;; (def test-map-2-flattened (traverse-to-flat test-map-2))
+;; (println "\ntest-map-2-flattened")
+;; (pp/pprint test-map-2-flattened)
+
+
+(defn diffl [arg-1 arg-2]
+  (let [flattened-1 (traverse-to-flat arg-1)
+        flattened-2 (traverse-to-flat arg-2)
+        keys-in-1 (set (keys flattened-1))
+        keys-in-2 (set (keys flattened-2))
+        keys-in-both (_set/intersection keys-in-1 keys-in-2)
+        keys-in-both-compare (fn [_key]
+                               (let [value-1 (get-in arg-1 _key ::not-found)
+                                     val-1-map-or-prim (as-> flattened-1 $
+                                                          (get $ _key)
+                                                          (:type $))
+                                     value-2 (get-in arg-2 _key ::not-found)
+                                     val-2-map-or-prim (as-> flattened-2 $
+                                                          (get $ _key)
+                                                          (:type $))
+                                     both-are-maps? (and (= ::map val-1-map-or-prim)
+                                                         (= ::map val-2-map-or-prim))
+                                     both-are-prims? (and (= ::primitive val-1-map-or-prim)
+                                                          (= ::primitive val-2-map-or-prim))]
+                                 (when-not (or both-are-maps?
+                                               (and both-are-prims?
+                                                    (= value-1 value-2)))
+                                   {:path _key :val-1 value-1 :val-2 value-2})))
+        value-diffs (as-> keys-in-both $
+                      (map #(keys-in-both-compare %) $)
+                      (remove nil? $)
+                      (vec $))
+        value-diff-paths (map :path value-diffs)
+        is-path-child-of-other-path? (fn [path-1 path-2]
+                                       (let [path-2-length (count path-2)
+                                             path-1-length (count path-1)]
+                                         (if (< path-1-length path-2-length)
+                                           false
+                                           (let [path-1-shortened (take path-2-length path-1)]
+                                             (= path-2 path-1-shortened)))))
+        is-missing-path-in-diffs? (fn [missing-path]
+                                    (some #(is-path-child-of-other-path? missing-path %) value-diff-paths))
+        remove-redundants (fn [keys-missing]
+                            (let [sorted-by-length (set (sort-by count keys-missing))]
+                              (reduce
+                               (fn [accum key-path]
+                                 (if (some #(is-path-child-of-other-path? key-path %) accum)
+                                   accum
+                                   (conj accum key-path)))
+                               []
+                               sorted-by-length)))
+        keys-missing-in-2 (as-> (_set/difference keys-in-1 keys-in-2) $
+                            (remove is-missing-path-in-diffs? $)
+                            (remove-redundants $))
+        keys-missing-in-1 (as-> (_set/difference keys-in-2 keys-in-1) $
+                            (remove is-missing-path-in-diffs? $)
+                            (remove-redundants $))]
+    {:keys-missing-in-1 keys-missing-in-1
+     :keys-missing-in-2 keys-missing-in-2
+     :value-differences value-diffs}))
 
 (defn- map-is-same? [map1 map2]
   (let [the-diff (diff map1 map2)]
     (and (nil? (first the-diff)) (nil? (nth the-diff 1)))))
 
-(deftest attempt
-  (let [expected-diff {:keypath [:what]
-                       :keypath-w-id [:what]
-                       :value-1 "nothing"
-                       :value-2 "who"}
+;; (def diffl-val (diffl test-map test-map-2))
+;; (println "\ndiffl-val")
+;; (pp/pprint diffl-val)
+
+
+(test/deftest initial
+  (let [expected {:keys-missing-in-1 [],
+                  :keys-missing-in-2 [],
+                  :value-differences [{:path [:what], :val-1 "nothing", :val-2 "who"}]}
         actual (diffl {:what "nothing"} {:what "who"})]
-    (is (= (count actual) 1))
-    (is (map-is-same? expected-diff (first actual)))))
+    (test/is (map-is-same? expected actual))))
 
-(deftest nil-arg
-  (let [expected-diff {:keypath [:what]
-                       :keypath-w-id [:what]
-                       :value-1 nil
-                       :value-2 {:who "why"}}
+
+(test/deftest nil-arg
+  (let [expected {:keys-missing-in-1 [],
+                  :keys-missing-in-2 [],
+                  :value-differences [{:path [:what], :val-1 nil, :val-2 {:who "why"}}]}
         actual (diffl {:what nil} {:what {:who "why"}})]
-    (is (= (count actual) 1))
-    (is (map-is-same? expected-diff (first actual)))
-    ;;(pp/pprint actual)
-    ))
+    (test/is (map-is-same? expected actual))))
 
-(deftest in-neither
-  (let [val-1 [{:one 1
-                :two 2}]
-        val-2 [{:one 2
-                :two 3}]
-        actual (diffl val-1 val-2 {[] #(:one %)})]
+(test/deftest missing-key
+  (let [map-1 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+                                       :level-3-2 {:level-4-1 "level-4-1-val"}}
+                           :level-2-2 "level-2-2-val"
+                           :level-2-3 "level-2-3-val"}
+               :level-1-2 "level-1-2-val"}
+        map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+
+                                         }
+                             :level-2-2 "level-2-2-val"
+                             :level-2-3 "level-2-3-val"}
+               :level-1-2 "level-1-2-val"}
+        expected {:keys-missing-in-1 [],
+                  :keys-missing-in-2 [[:level-1-1 :level-2-1 :level-3-2]],
+                  :value-differences []}
+        actual (diffl map-1 map-2)]
     ;; (pp/pprint actual)
-    (is (= 2 (count actual)))
-    (let [in-1 (filter #(not (nil? (:value-1 %))) actual)
-          in-2 (filter #(not (nil? (:value-2 %))) actual)]
-      (is (= 1 (count in-1)))
-      (is (= 1 (count in-2)))
-      (is (map-is-same? (-> in-1 first :value-1) (first val-1)))
-      (is (map-is-same? (-> in-2 first :value-2) (first val-2))))))
-
-(deftest deeper
-  (is (map-is-same?
-       {:keypath [:what :who]
-        :keypath-w-id [:what :who]
-        :value-1 "one"
-        :value-2 "two"}
-       (first (diffl {:what {:who "one"}} {:what {:who "two"}})))))
-
-(deftest my-diff-with-vectors
-  (let [val-1 [{:two 2
-                :three "three"}]
-        val-2 [{:two 2
-                :three "four"}]
-        expected-diff {:keypath [:three]
-                       :keypath-w-id [2 :three]
-                       :value-1 "three"
-                       :value-2 "four"}]
-    (is (map-is-same? expected-diff
-                      (first (diffl val-1 val-2 {[] #(:two %)}))))))
-
-(defn- get-map-from-seq [coll ident-func]
-  (first (filter ident-func coll)))
-
-(defn- my-get-in
-  ([obj keypath] (my-get-in obj keypath 0))
-  ([obj keypath depth]
-   (pp/pprint {:obj obj
-               :obj-type (.getName (type obj))
-               :keypath keypath
-               :depth depth})
-   (if (= 1 (count keypath))
-     (cond
-       (map? obj)
-       ((first keypath) obj)
-       (sequential? obj)
-       (let [key-type-name (.getName (type (first keypath)))]
-         (if (is-func? (first keypath))
-           (first (filter (first keypath) obj))
-           (throw (Exception. (str "Need a function to know how to pick from a list.  type is " key-type-name)))))
-       :else
-       (throw (Exception. (str "Only know how to handle map or vector, obj type is" (.getName (type obj))))))
-     (cond
-       (map? obj)
-       (recur ((first keypath) obj) (take-last (- (count keypath) 1) keypath) (+ depth 1))
-       (sequential? obj)
-       (recur (first (filter (first keypath) obj)) (take-last (- (count keypath) 1) keypath) (+ depth 1))))))
-
-(deftest test-my-get-in
-  (let [expected "two"]
-    (is (= "two"
-           (my-get-in {:one {:two "two"}} [:one :two])))
-    (is (= "tttt"
-           (my-get-in {:one {:two {:three "tttt"}}} [:one :two :three])))))
-
-
-(deftest test-my-get-in-with-list
-  (is (= 4
-         (my-get-in {:one [{:two 2
-                            :three {:four 4}}
-                           {:five "five"
-                            :six 6}]}
-                    [:one
-                     #(and (contains? % :two) (= (:two %) 2))
-                     :three
-                     :four]))))
-
-
+    (test/is (map-is-same? expected actual))))
