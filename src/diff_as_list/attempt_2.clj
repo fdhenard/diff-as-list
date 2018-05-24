@@ -1,16 +1,18 @@
 (ns diff-as-list.attempt-2
   (:require [clojure.test :as test]
             [clojure.set :as _set]
-            [clojure.pprint :as pp]))
+            [clojure.pprint :as pp]
+            [clojure.data :refer [diff]]
+            [clojure.test :as test]))
 
 (defn- is-primitive? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword"} (.getName (type val))))
 
-;; (deftest primitive
-;;   (is (= true (is-primitive? "test")))
-;;   (is (is-primitive? 1))
-;;   (is (not (is-primitive? {})))
-;;   (is (not (is-primitive? []))))
+(test/deftest primitive
+  (test/is (= true (is-primitive? "test")))
+  (test/is (is-primitive? 1))
+  (test/is (not (is-primitive? {})))
+  (test/is (not (is-primitive? []))))
 
 
 (defn traverse-to-flat
@@ -26,14 +28,11 @@
        (cond
          (or (nil? value) (is-primitive? value))
          (do
-           ;; below conjes result into a vector
-           ;; (recur in-val (rest remaining-traversal) (first remaining-traversal) (conj result {:path in-path :value value}))
            ;; below assoces result into a map
            (recur in-val
                   (rest remaining-traversal)
                   (first remaining-traversal)
-                  (assoc result in-path {:type ::primitive :value value}))
-           )
+                  (assoc result in-path {:type ::primitive :value value})))
          (map? value)
          (let [_keys (keys value)
                first-key (first _keys)
@@ -44,47 +43,39 @@
            (recur in-val
                   (concat remaining-traversal remain-trvrs-to-add)
                   (conj in-path first-key)
-                  (assoc result in-path {:type ::map})
-                  ;; result
-                  ))
+                  (assoc result in-path {:type ::map})))
          :else
-         (throw (Exception. "don't know how to handle type " (.getName (type value)))))))
-   ))
+         (throw (Exception. "don't know how to handle type " (.getName (type value)))))))))
 
 
-(println "\n\n---- new compile ----")
+;; (println "\n\n---- new compile ----")
 
 
-(def test-map {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
-                                       :level-3-2 {:level-4-1 "level-4-1-val"}}
-                           :level-2-2 "level-2-2-val"
-                           :level-2-3 "level-2-3-val"}
-               :level-1-2 "level-1-2-val"})
+;; (def test-map {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+;;                                        :level-3-2 {:level-4-1 "level-4-1-val"}}
+;;                            :level-2-2 "level-2-2-val"
+;;                            :level-2-3 "level-2-3-val"}
+;;                :level-1-2 "level-1-2-val"})
 
-(println "\ntest-map")
-(pp/pprint test-map)
-(def test-map-flattened (traverse-to-flat test-map))
-(println "\ntest-map-flattened")
-(pp/pprint test-map-flattened)
+;; (println "\ntest-map")
+;; (pp/pprint test-map)
+;; (def test-map-flattened (traverse-to-flat test-map))
+;; (println "\ntest-map-flattened")
+;; (pp/pprint test-map-flattened)
 
-(def test-map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
-                                         :level-3-2 nil
-                                         }
-                             :level-2-2 "level-2-2-val"
-                             :level-2-3 "level-2-3-val"}
-                 :level-1-2 "level-1-2-val"})
+;; (def test-map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+;;                                          :level-3-2 nil
+;;                                          }
+;;                              :level-2-2 "level-2-2-val"
+;;                              :level-2-3 "level-2-3-val"}
+;;                  :level-1-2 "level-1-2-val"})
 
-(println "\ntest-map-2")
-(pp/pprint test-map-2)
-(def test-map-2-flattened (traverse-to-flat test-map-2))
-(println "\ntest-map-2-flattened")
-(pp/pprint test-map-2-flattened)
+;; (println "\ntest-map-2")
+;; (pp/pprint test-map-2)
+;; (def test-map-2-flattened (traverse-to-flat test-map-2))
+;; (println "\ntest-map-2-flattened")
+;; (pp/pprint test-map-2-flattened)
 
-
-;; (def diffed (clojure.data/diff test-map test-map-2))
-
-;; (println "\ndiffed")
-;; (pp/pprint diffed)
 
 (defn diffl [arg-1 arg-2]
   (let [flattened-1 (traverse-to-flat arg-1)
@@ -142,11 +133,45 @@
      :keys-missing-in-2 keys-missing-in-2
      :value-differences value-diffs}))
 
-(def diffl-val (diffl test-map test-map-2))
-(println "\ndiffl-val")
-(pp/pprint diffl-val)
+(defn- map-is-same? [map1 map2]
+  (let [the-diff (diff map1 map2)]
+    (and (nil? (first the-diff)) (nil? (nth the-diff 1)))))
 
-;; (deftest initial
-;;   (let [expected {:keys-missing-in-1 [], :keys-missing-in-2 [], :value-differences ({:path [:what], :val-1 "nothing", :val-2 "who"})}
-;;         actual (diffl {:what "nothing"} {:what "who"})]
-;;     ))
+;; (def diffl-val (diffl test-map test-map-2))
+;; (println "\ndiffl-val")
+;; (pp/pprint diffl-val)
+
+
+(test/deftest initial
+  (let [expected {:keys-missing-in-1 [],
+                  :keys-missing-in-2 [],
+                  :value-differences [{:path [:what], :val-1 "nothing", :val-2 "who"}]}
+        actual (diffl {:what "nothing"} {:what "who"})]
+    (test/is (map-is-same? expected actual))))
+
+
+(test/deftest nil-arg
+  (let [expected {:keys-missing-in-1 [],
+                  :keys-missing-in-2 [],
+                  :value-differences [{:path [:what], :val-1 nil, :val-2 {:who "why"}}]}
+        actual (diffl {:what nil} {:what {:who "why"}})]
+    (test/is (map-is-same? expected actual))))
+
+(test/deftest missing-key
+  (let [map-1 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+                                       :level-3-2 {:level-4-1 "level-4-1-val"}}
+                           :level-2-2 "level-2-2-val"
+                           :level-2-3 "level-2-3-val"}
+               :level-1-2 "level-1-2-val"}
+        map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+
+                                         }
+                             :level-2-2 "level-2-2-val"
+                             :level-2-3 "level-2-3-val"}
+               :level-1-2 "level-1-2-val"}
+        expected {:keys-missing-in-1 [],
+                  :keys-missing-in-2 [[:level-1-1 :level-2-1 :level-3-2]],
+                  :value-differences []}
+        actual (diffl map-1 map-2)]
+    ;; (pp/pprint actual)
+    (test/is (map-is-same? expected actual))))
