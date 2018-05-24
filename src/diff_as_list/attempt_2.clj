@@ -68,7 +68,7 @@
 (pp/pprint test-map-flattened)
 
 (def test-map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
-                                         ;; :level-3-2 nil
+                                         :level-3-2 nil
                                          }
                              :level-2-2 "level-2-2-val"
                              :level-2-3 "level-2-3-val"}
@@ -119,19 +119,26 @@
                                            false
                                            (let [path-1-shortened (take path-2-length path-1)]
                                              (= path-2 path-1-shortened)))))
-        ;; is-missing-key-in-diffs? #(contains? value-diff-path-set %)
         is-missing-path-in-diffs? (fn [missing-path]
                                     (some #(is-path-child-of-other-path? missing-path %) value-diff-paths))
+        remove-redundants (fn [keys-missing]
+                            (let [sorted (set (sort-by count keys-missing))]
+                              (reduce
+                               (fn [accum key-path]
+                                 (if (some #(is-path-child-of-other-path? key-path %) accum)
+                                   accum
+                                   (conj accum key-path)))
+                               []
+                               sorted)))
         keys-missing-in-2 (as-> (_set/difference keys-in-1 keys-in-2) $
-                            (remove is-missing-path-in-diffs? $))
+                            (remove is-missing-path-in-diffs? $)
+                            (remove-redundants $))
         keys-missing-in-1 (as-> (_set/difference keys-in-2 keys-in-1) $
-                            (remove is-missing-path-in-diffs? $))
-        
-        ]
+                            (remove is-missing-path-in-diffs? $)
+                            (remove-redundants $))]
     {:keys-missing-in-1 keys-missing-in-1
      :keys-missing-in-2 keys-missing-in-2
-     :value-differences value-diffs}
-    ))
+     :value-differences value-diffs}))
 
 (def diffl-val (diffl test-map test-map-2))
 (println "\ndiffl-val")
