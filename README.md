@@ -14,5 +14,4 @@ Compare clojure maps. The differences come back as a list with paths to where th
 
 Copyright © 2018 Frank Henard
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+Distributed under the MIT License
