@@ -109,7 +109,10 @@
                                                (and both-are-prims?
                                                     (= value-1 value-2)))
                                    {:path _key :val-1 value-1 :val-2 value-2})))
-        value-diffs (remove nil? (map #(keys-in-both-compare %) keys-in-both))
+        value-diffs (as-> keys-in-both $
+                      (map #(keys-in-both-compare %) $)
+                      (remove nil? $)
+                      (vec $))
         value-diff-paths (map :path value-diffs)
         is-path-child-of-other-path? (fn [path-1 path-2]
                                        (let [path-2-length (count path-2)
@@ -142,3 +145,8 @@
 (def diffl-val (diffl test-map test-map-2))
 (println "\ndiffl-val")
 (pp/pprint diffl-val)
+
+;; (deftest initial
+;;   (let [expected {:keys-missing-in-1 [], :keys-missing-in-2 [], :value-differences ({:path [:what], :val-1 "nothing", :val-2 "who"})}
+;;         actual (diffl {:what "nothing"} {:what "who"})]
+;;     ))
