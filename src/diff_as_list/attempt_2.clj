@@ -104,8 +104,7 @@
                                      both-are-maps? (and (= ::map val-1-map-or-prim)
                                                          (= ::map val-2-map-or-prim))
                                      both-are-prims? (and (= ::primitive val-1-map-or-prim)
-                                                          (= ::primitive val-2-map-or-prim))
-                                     ]
+                                                          (= ::primitive val-2-map-or-prim))]
                                  (when-not (or both-are-maps?
                                                (and both-are-prims?
                                                     (= value-1 value-2)))
@@ -122,14 +121,14 @@
         is-missing-path-in-diffs? (fn [missing-path]
                                     (some #(is-path-child-of-other-path? missing-path %) value-diff-paths))
         remove-redundants (fn [keys-missing]
-                            (let [sorted (set (sort-by count keys-missing))]
+                            (let [sorted-by-length (set (sort-by count keys-missing))]
                               (reduce
                                (fn [accum key-path]
                                  (if (some #(is-path-child-of-other-path? key-path %) accum)
                                    accum
                                    (conj accum key-path)))
                                []
-                               sorted)))
+                               sorted-by-length)))
         keys-missing-in-2 (as-> (_set/difference keys-in-1 keys-in-2) $
                             (remove is-missing-path-in-diffs? $)
                             (remove-redundants $))
