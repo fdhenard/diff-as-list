@@ -125,10 +125,12 @@
                                sorted-by-length)))
         keys-missing-in-2 (as-> (_set/difference keys-in-1 keys-in-2) $
                             (remove is-missing-path-in-diffs? $)
-                            (remove-redundants $))
+                            (remove-redundants $)
+                            (map #(hash-map :path % :value (get-in arg-1 %)) $))
         keys-missing-in-1 (as-> (_set/difference keys-in-2 keys-in-1) $
                             (remove is-missing-path-in-diffs? $)
-                            (remove-redundants $))]
+                            (remove-redundants $)
+                            (map #(hash-map :path % :value (get-in arg-2 %)) $))]
     {:keys-missing-in-1 keys-missing-in-1
      :keys-missing-in-2 keys-missing-in-2
      :value-differences value-diffs}))
@@ -163,15 +165,93 @@
                            :level-2-2 "level-2-2-val"
                            :level-2-3 "level-2-3-val"}
                :level-1-2 "level-1-2-val"}
-        map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
-
-                                         }
+        map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"}
                              :level-2-2 "level-2-2-val"
                              :level-2-3 "level-2-3-val"}
                :level-1-2 "level-1-2-val"}
         expected {:keys-missing-in-1 [],
-                  :keys-missing-in-2 [[:level-1-1 :level-2-1 :level-3-2]],
+                  :keys-missing-in-2 [
+                                      {:path [:level-1-1 :level-2-1 :level-3-2]
+                                       :value {:level-4-1 "level-4-1-val"}}],
                   :value-differences []}
         actual (diffl map-1 map-2)]
     ;; (pp/pprint actual)
     (test/is (map-is-same? expected actual))))
+
+
+
+
+
+
+
+(defn patch [orig-map _diff]
+  (let [apply-value-diff (fn [accum value-diff]
+                           (assoc-in accum (:path value-diff) (:val-2 value-diff)))
+        remove-key (fn [accum removed-key]
+                     (let [removed-key-path (:path removed-key)]
+                       (if (<= (count removed-key-path) 1)
+                         (dissoc accum (first removed-key-path))
+                         (update-in accum (drop-last removed-key-path) dissoc (last removed-key-path)))))
+        add-key (fn [accum added-key]
+                  (assoc-in accum (:path added-key) (:value added-key)))]
+    (as-> orig-map $
+      (reduce apply-value-diff $ (:value-differences _diff))
+      (reduce remove-key $ (:keys-missing-in-2 _diff))
+      (reduce add-key $ (:keys-missing-in-1 _diff))
+      )))
+
+
+
+
+
+(test/deftest patch-initial
+  (let [orig-map {:what "nothing"}
+        _diff {:keys-missing-in-1 [],
+               :keys-missing-in-2 [],
+               :value-differences [{:path [:what], :val-1 "nothing", :val-2 "who"}]}
+        expected {:what "who"}
+        actual (patch orig-map _diff)]
+    ;; (pp/pprint actual)
+    (test/is (= expected actual))))
+
+(test/deftest patch-nil-arg
+  (let [orig-map {:what nil}
+        _diff {:keys-missing-in-1 [],
+               :keys-missing-in-2 [],
+               :value-differences [{:path [:what], :val-1 nil, :val-2 {:who "why"}}]}
+        expected {:what {:who "why"}}
+        actual (patch orig-map _diff)]
+    (test/is (= expected actual))))
+
+
+(test/deftest patch-key-removed
+  (let [orig-map {:what "one"
+                  :who "two"}
+        _diff {:keys-missing-in-1 []
+               :keys-missing-in-2 [{:path [:who] :value "two"}]
+               :value-differences []}
+        expected {:what "one"}
+        actual (patch orig-map _diff)]
+    (test/is (= expected actual))))
+
+(test/deftest patch-key-removed-nested
+  (let [orig-map {:what {:why "who"}}
+        _diff {:keys-missing-in-1 []
+               :keys-missing-in-2 [{:path [:what :why] :value "who"}]
+               :value-differences []}
+        expected {:what {}}
+        actual (patch orig-map _diff)
+        ]
+    (test/is (= expected actual))))
+
+
+;; (def/deftest patch-added-key) !!!!!!
+(test/deftest patch-key-added
+  (let [orig-map {:what {}}
+        _diff {:keys-missing-in-1 [{:path [:what :why] :value "who"}]
+               :keys-missing-in-2 []
+               :value-differences []}
+        expected {:what {:why "who"}}
+        actual (patch orig-map _diff)]
+    (test/is (= expected actual))))
+
