@@ -186,7 +186,10 @@
 
 (defn patch [orig-map _diff]
   (let [apply-value-diff (fn [accum value-diff]
-                           (assoc-in accum (:path value-diff) (:val-2 value-diff)))
+                           (let [new-val (:val-2 value-diff)]
+                             (if (nil? accum)
+                               new-val
+                               (assoc-in accum (:path value-diff) new-val))))
         remove-key (fn [accum removed-key]
                      (let [removed-key-path (:path removed-key)]
                        (if (<= (count removed-key-path) 1)
@@ -195,6 +198,7 @@
         add-key (fn [accum added-key]
                   (assoc-in accum (:path added-key) (:value added-key)))]
     (as-> orig-map $
+      ;; (if (nil? $) {} $)
       (reduce apply-value-diff $ (:value-differences _diff))
       (reduce remove-key $ (:keys-missing-in-2 _diff))
       (reduce add-key $ (:keys-missing-in-1 _diff))
@@ -255,3 +259,12 @@
         actual (patch orig-map _diff)]
     (test/is (= expected actual))))
 
+
+(test/deftest patch-nil-to-value
+  (let [orig-map nil
+        _diff {:keys-missing-in-1 (), :keys-missing-in-2 (),
+               :value-differences [{:path [], :val-1 nil, :val-2 {:what "who"}}]}
+        expected {:what "who"}
+        actual (patch orig-map _diff)
+        ]
+    (test/is (= expected actual))))
