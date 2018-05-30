@@ -2,7 +2,13 @@
 
 Compare clojure maps. The differences come back as a list with paths to where the elements differ.
 
+## diffl
+
 `(diffl ...)` compares two maps or "primitives" (int, string, keyword).  It does not work with sequences.  It's origins come from the need to compare large xml files.  Clojure core's diff was not adequate because I wanted to see a list of all the differences with the path to the most primitive element difference possible.
+
+## patch
+
+`(patch a-map diff)` applies a diff to a map to get a new map from the applied diff
 
 ## Reason for removal of sequence comparison - version 2.0.0 - 5/24/18
 
