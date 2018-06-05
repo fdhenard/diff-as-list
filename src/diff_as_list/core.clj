@@ -133,7 +133,8 @@
                             (map #(hash-map :path % :value (get-in arg-2 %)) $))]
     {:keys-missing-in-1 keys-missing-in-1
      :keys-missing-in-2 keys-missing-in-2
-     :value-differences value-diffs}))
+     :value-differences value-diffs
+     :dal-version (System/getProperty "diff-as-list.version")}))
 
 (defn- map-is-same? [map1 map2]
   (let [the-diff (diff map1 map2)]
@@ -148,7 +149,8 @@
   (let [expected {:keys-missing-in-1 [],
                   :keys-missing-in-2 [],
                   :value-differences [{:path [:what], :val-1 "nothing", :val-2 "who"}]}
-        actual (diffl {:what "nothing"} {:what "who"})]
+        actual (-> (diffl {:what "nothing"} {:what "who"})
+                   (dissoc :dal-version))]
     (test/is (map-is-same? expected actual))))
 
 
@@ -156,7 +158,8 @@
   (let [expected {:keys-missing-in-1 [],
                   :keys-missing-in-2 [],
                   :value-differences [{:path [:what], :val-1 nil, :val-2 {:who "why"}}]}
-        actual (diffl {:what nil} {:what {:who "why"}})]
+        actual (-> (diffl {:what nil} {:what {:who "why"}})
+                   (dissoc :dal-version))]
     (test/is (map-is-same? expected actual))))
 
 (test/deftest missing-key
@@ -174,7 +177,8 @@
                                       {:path [:level-1-1 :level-2-1 :level-3-2]
                                        :value {:level-4-1 "level-4-1-val"}}],
                   :value-differences []}
-        actual (diffl map-1 map-2)]
+        actual (-> (diffl map-1 map-2)
+                   (dissoc :dal-version))]
     ;; (pp/pprint actual)
     (test/is (map-is-same? expected actual))))
 
