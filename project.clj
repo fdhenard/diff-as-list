@@ -1,4 +1,4 @@
-(defproject diff-as-list "2.2.0"
+(defproject diff-as-list (slurp "VERSION")
   :description "Compare clojure data structures. The differences come back as a list with paths to where the elements differ"
   :url "https://github.com/fdhenard/diff-as-list"
   :license {:name "MIT License"

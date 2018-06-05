@@ -272,3 +272,9 @@
         actual (patch orig-map _diff)
         ]
     (test/is (= expected actual))))
+
+
+(defn get-version []
+  (slurp "VERSION")
+  ;; (some-> (io/resource "project.clj") slurp edn/read-string (nth 2))
+  )
