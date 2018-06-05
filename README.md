@@ -20,6 +20,10 @@ The original version worked with sequences, and the user had to provide a mappin
 
     (diffl obj1 obj2)
 
+## Build Notes
+
+When bumping version be sure to change it in `project.clj` and `core.clj`
+
 ## License
 
 Copyright © 2018 Frank Henard

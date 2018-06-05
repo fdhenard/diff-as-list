@@ -6,8 +6,7 @@
             [clojure.test :as test]
             [clojure.string :as str]))
 
-(def version (-> (slurp "VERSION")
-                 str/trim))
+(def version "2.2.3")
 
 (defn- is-primitive? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword"} (.getName (type val))))
