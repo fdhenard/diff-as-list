@@ -3,7 +3,11 @@
             [clojure.set :as _set]
             [clojure.pprint :as pp]
             [clojure.data :refer [diff]]
-            [clojure.test :as test]))
+            [clojure.test :as test]
+            [clojure.string :as str]))
+
+(def version (-> (slurp "VERSION")
+                 str/trim))
 
 (defn- is-primitive? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword"} (.getName (type val))))
@@ -134,7 +138,7 @@
     {:keys-missing-in-1 keys-missing-in-1
      :keys-missing-in-2 keys-missing-in-2
      :value-differences value-diffs
-     :dal-version (System/getProperty "diff-as-list.version")}))
+     :dal-version version}))
 
 (defn- map-is-same? [map1 map2]
   (let [the-diff (diff map1 map2)]
@@ -143,7 +147,6 @@
 ;; (def diffl-val (diffl test-map test-map-2))
 ;; (println "\ndiffl-val")
 ;; (pp/pprint diffl-val)
-
 
 (test/deftest initial
   (let [expected {:keys-missing-in-1 [],
@@ -272,9 +275,3 @@
         actual (patch orig-map _diff)
         ]
     (test/is (= expected actual))))
-
-
-(defn get-version []
-  (slurp "VERSION")
-  ;; (some-> (io/resource "project.clj") slurp edn/read-string (nth 2))
-  )
