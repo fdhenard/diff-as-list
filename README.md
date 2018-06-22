@@ -24,6 +24,8 @@ The original version worked with sequences, and the user had to provide a mappin
 
 When bumping version be sure to change it in `project.clj` and the `(def version "x.x.x")` at the top of `core.clj`
 
+    $ lein deploy clojars
+
 ## License
 
 Copyright © 2018 Frank Henard
