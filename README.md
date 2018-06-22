@@ -22,7 +22,7 @@ The original version worked with sequences, and the user had to provide a mappin
 
 ## Build Notes
 
-When bumping version be sure to change it in `project.clj` and `core.clj`
+When bumping version be sure to change it in `project.clj` and the `(def version "x.x.x")` at the top of `core.clj`
 
 ## License
 

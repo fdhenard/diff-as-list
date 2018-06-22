@@ -6,7 +6,7 @@
             [clojure.test :as test]
             [clojure.string :as str]))
 
-(def version "2.2.3")
+  (def version "2.2.4")
 
 (defn- is-primitive? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword"} (.getName (type val))))
@@ -118,7 +118,7 @@
         is-missing-path-in-diffs? (fn [missing-path]
                                     (some #(is-path-child-of-other-path? missing-path %) value-diff-paths))
         remove-redundants (fn [keys-missing]
-                            (let [sorted-by-length (set (sort-by count keys-missing))]
+                            (let [sorted-by-length (sort-by count keys-missing)]
                               (reduce
                                (fn [accum key-path]
                                  (if (some #(is-path-child-of-other-path? key-path %) accum)
@@ -129,11 +129,13 @@
         keys-missing-in-2 (as-> (_set/difference keys-in-1 keys-in-2) $
                             (remove is-missing-path-in-diffs? $)
                             (remove-redundants $)
-                            (map #(hash-map :path % :value (get-in arg-1 %)) $))
+                            (map #(hash-map :path % :value (get-in arg-1 %)) $)
+                            (vec $))
         keys-missing-in-1 (as-> (_set/difference keys-in-2 keys-in-1) $
                             (remove is-missing-path-in-diffs? $)
                             (remove-redundants $)
-                            (map #(hash-map :path % :value (get-in arg-2 %)) $))]
+                            (map #(hash-map :path % :value (get-in arg-2 %)) $)
+                            (vec $))]
     {:keys-missing-in-1 keys-missing-in-1
      :keys-missing-in-2 keys-missing-in-2
      :value-differences value-diffs
@@ -181,6 +183,31 @@
                   :value-differences []}
         actual (-> (diffl map-1 map-2)
                    (dissoc :dal-version))]
+    ;; (pp/pprint actual)
+    (test/is (map-is-same? expected actual))))
+
+(test/deftest remove-redundant
+  (let [map-1 {:question-section
+               {:name "question-section",
+                :fields {:text {:name "text", :type :character, :max-length 200}}}}
+        map-2 {:question-section
+               {:name "question-section",
+                :fields
+                {:text {:name "text", :type :character, :max-length 200},
+                 :bogus {:name "bogus", :type :integer},
+                 :what {:name "what", :type :djunk}}}}
+        expected {:keys-missing-in-1
+                  [{:path [:question-section :fields :bogus],
+                    :value {:name "bogus", :type :integer}}
+                   {:path [:question-section :fields :what],
+                    :value {:name "what", :type :djunk}}],
+                  :keys-missing-in-2 [],
+                  :value-differences []}
+        actual (-> (diffl map-1 map-2)
+                   (dissoc :dal-version))]
+    ;; (println "\nexpected:")
+    ;; (pp/pprint expected)
+    ;; (println "\n:actual:")
     ;; (pp/pprint actual)
     (test/is (map-is-same? expected actual))))
 
