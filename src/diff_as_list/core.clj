@@ -6,7 +6,7 @@
             [clojure.test :as test]
             [clojure.string :as str]))
 
-  (def version "2.2.4")
+  (def version "2.2.5")
 
 (defn- is-primitive? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword"} (.getName (type val))))
@@ -48,7 +48,7 @@
                   (conj in-path first-key)
                   (assoc result in-path {:type ::map})))
          :else
-         (throw (Exception. "don't know how to handle type " (.getName (type value)))))))))
+         (throw (Exception. (str "don't know how to handle type " (.getName (type value))))))))))
 
 
 ;; (println "\n\n---- new compile ----")
