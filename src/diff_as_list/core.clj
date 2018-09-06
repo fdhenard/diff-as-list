@@ -6,10 +6,10 @@
             [clojure.test :as test]
             [clojure.string :as str]))
 
-  (def version "2.2.5")
+  (def version "2.2.6")
 
 (defn- is-primitive? [val]
-  (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword"} (.getName (type val))))
+  (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword" "java.lang.Boolean"} (.getName (type val))))
 
 (test/deftest primitive
   (test/is (= true (is-primitive? "test")))
