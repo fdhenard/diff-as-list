@@ -6,7 +6,7 @@
             [clojure.test :as test]
             [clojure.string :as str]))
 
-  (def version "2.2.6")
+(def version "2.2.6")
 
 (defn- is-primitive? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword" "java.lang.Boolean"} (.getName (type val))))
@@ -51,33 +51,51 @@
          (throw (Exception. (str "don't know how to handle type " (.getName (type value))))))))))
 
 
-;; (println "\n\n---- new compile ----")
+(test/deftest ttf-1
+  (let [actual (traverse-to-flat {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+                                                          :level-3-2 {:level-4-1 "level-4-1-val"}}
+                                              :level-2-2 "level-2-2-val"
+                                              :level-2-3 "level-2-3-val"}
+                                  :level-1-2 "level-1-2-val"})
+        expected {[] {:type :diff-as-list.core/map},
+                  [:level-1-1] {:type :diff-as-list.core/map},
+                  [:level-1-1 :level-2-1] {:type :diff-as-list.core/map},
+                  [:level-1-1 :level-2-1 :level-3-1]
+                  {:type :diff-as-list.core/primitive, :value "level-3-1-val"},
+                  [:level-1-2]
+                  {:type :diff-as-list.core/primitive, :value "level-1-2-val"},
+                  [:level-1-1 :level-2-2]
+                  {:type :diff-as-list.core/primitive, :value "level-2-2-val"},
+                  [:level-1-1 :level-2-3]
+                  {:type :diff-as-list.core/primitive, :value "level-2-3-val"},
+                  [:level-1-1 :level-2-1 :level-3-2] {:type :diff-as-list.core/map},
+                  [:level-1-1 :level-2-1 :level-3-2 :level-4-1]
+                  {:type :diff-as-list.core/primitive, :value "level-4-1-val"}}]
+    ;; (pp/pprint actual)
+    (test/is (= actual expected))))
 
-
-;; (def test-map {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
-;;                                        :level-3-2 {:level-4-1 "level-4-1-val"}}
-;;                            :level-2-2 "level-2-2-val"
-;;                            :level-2-3 "level-2-3-val"}
-;;                :level-1-2 "level-1-2-val"})
-
-;; (println "\ntest-map")
-;; (pp/pprint test-map)
-;; (def test-map-flattened (traverse-to-flat test-map))
-;; (println "\ntest-map-flattened")
-;; (pp/pprint test-map-flattened)
-
-;; (def test-map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
-;;                                          :level-3-2 nil
-;;                                          }
-;;                              :level-2-2 "level-2-2-val"
-;;                              :level-2-3 "level-2-3-val"}
-;;                  :level-1-2 "level-1-2-val"})
-
-;; (println "\ntest-map-2")
-;; (pp/pprint test-map-2)
-;; (def test-map-2-flattened (traverse-to-flat test-map-2))
-;; (println "\ntest-map-2-flattened")
-;; (pp/pprint test-map-2-flattened)
+(test/deftest ttf-2
+  (let [actual (traverse-to-flat  {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
+                                                           :level-3-2 nil
+                                                           }
+                                               :level-2-2 "level-2-2-val"
+                                               :level-2-3 "level-2-3-val"}
+                                   :level-1-2 "level-1-2-val"})
+        expected {[] {:type :diff-as-list.core/map},
+                  [:level-1-1] {:type :diff-as-list.core/map},
+                  [:level-1-1 :level-2-1] {:type :diff-as-list.core/map},
+                  [:level-1-1 :level-2-1 :level-3-1]
+                  {:type :diff-as-list.core/primitive, :value "level-3-1-val"},
+                  [:level-1-2]
+                  {:type :diff-as-list.core/primitive, :value "level-1-2-val"},
+                  [:level-1-1 :level-2-2]
+                  {:type :diff-as-list.core/primitive, :value "level-2-2-val"},
+                  [:level-1-1 :level-2-3]
+                  {:type :diff-as-list.core/primitive, :value "level-2-3-val"},
+                  [:level-1-1 :level-2-1 :level-3-2]
+                  {:type :diff-as-list.core/primitive, :value nil}}]
+    ;; (pp/pprint actual)
+    (test/is (= actual expected))))
 
 
 (defn diffl [arg-1 arg-2]
@@ -111,10 +129,9 @@
         is-path-child-of-other-path? (fn [path-1 path-2]
                                        (let [path-2-length (count path-2)
                                              path-1-length (count path-1)]
-                                         (if (< path-1-length path-2-length)
-                                           false
-                                           (let [path-1-shortened (take path-2-length path-1)]
-                                             (= path-2 path-1-shortened)))))
+                                         (and (>= path-1-length path-2-length)
+                                              (let [path-1-shortened (take path-2-length path-1)]
+                                                (= path-2 path-1-shortened)))))
         is-missing-path-in-diffs? (fn [missing-path]
                                     (some #(is-path-child-of-other-path? missing-path %) value-diff-paths))
         remove-redundants (fn [keys-missing]
