@@ -162,9 +162,7 @@
   (let [the-diff (diff map1 map2)]
     (and (nil? (first the-diff)) (nil? (nth the-diff 1)))))
 
-;; (def diffl-val (diffl test-map test-map-2))
-;; (println "\ndiffl-val")
-;; (pp/pprint diffl-val)
+
 
 (test/deftest initial
   (let [expected {:keys-missing-in-1 [],
