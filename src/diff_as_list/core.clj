@@ -158,9 +158,9 @@
      :value-differences value-diffs
      :dal-version version}))
 
-(defn- map-is-same? [map1 map2]
-  (let [the-diff (diff map1 map2)]
-    (and (nil? (first the-diff)) (nil? (nth the-diff 1)))))
+;; (defn- map-is-same? [map1 map2]
+;;   (let [the-diff (diff map1 map2)]
+;;     (and (nil? (first the-diff)) (nil? (nth the-diff 1)))))
 
 
 
@@ -170,7 +170,7 @@
                   :value-differences [{:path [:what], :val-1 "nothing", :val-2 "who"}]}
         actual (-> (diffl {:what "nothing"} {:what "who"})
                    (dissoc :dal-version))]
-    (test/is (map-is-same? expected actual))))
+    (test/is (= expected actual))))
 
 
 (test/deftest nil-arg
@@ -179,7 +179,7 @@
                   :value-differences [{:path [:what], :val-1 nil, :val-2 {:who "why"}}]}
         actual (-> (diffl {:what nil} {:what {:who "why"}})
                    (dissoc :dal-version))]
-    (test/is (map-is-same? expected actual))))
+    (test/is (= expected actual))))
 
 (test/deftest missing-key
   (let [map-1 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
@@ -199,7 +199,7 @@
         actual (-> (diffl map-1 map-2)
                    (dissoc :dal-version))]
     ;; (pp/pprint actual)
-    (test/is (map-is-same? expected actual))))
+    (test/is (= expected actual))))
 
 (test/deftest remove-redundant
   (let [map-1 {:question-section
@@ -224,7 +224,7 @@
     ;; (pp/pprint expected)
     ;; (println "\n:actual:")
     ;; (pp/pprint actual)
-    (test/is (map-is-same? expected actual))))
+    (test/is (= expected actual))))
 
 
 
