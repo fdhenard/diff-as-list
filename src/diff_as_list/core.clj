@@ -6,16 +6,10 @@
             [clojure.test :as test]
             [clojure.string :as str]))
 
-(def version "2.2.6")
+(def version "3.0.0")
 
-(defn- is-primitive? [val]
+(defn is-primitive? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword" "java.lang.Boolean"} (.getName (type val))))
-
-(test/deftest primitive
-  (test/is (= true (is-primitive? "test")))
-  (test/is (is-primitive? 1))
-  (test/is (not (is-primitive? {})))
-  (test/is (not (is-primitive? []))))
 
 
 (defn traverse-to-flat
@@ -51,51 +45,25 @@
          (throw (Exception. (str "don't know how to handle type " (.getName (type value))))))))))
 
 
-(test/deftest ttf-1
-  (let [actual (traverse-to-flat {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
-                                                          :level-3-2 {:level-4-1 "level-4-1-val"}}
-                                              :level-2-2 "level-2-2-val"
-                                              :level-2-3 "level-2-3-val"}
-                                  :level-1-2 "level-1-2-val"})
-        expected {[] {:type :diff-as-list.core/map},
-                  [:level-1-1] {:type :diff-as-list.core/map},
-                  [:level-1-1 :level-2-1] {:type :diff-as-list.core/map},
-                  [:level-1-1 :level-2-1 :level-3-1]
-                  {:type :diff-as-list.core/primitive, :value "level-3-1-val"},
-                  [:level-1-2]
-                  {:type :diff-as-list.core/primitive, :value "level-1-2-val"},
-                  [:level-1-1 :level-2-2]
-                  {:type :diff-as-list.core/primitive, :value "level-2-2-val"},
-                  [:level-1-1 :level-2-3]
-                  {:type :diff-as-list.core/primitive, :value "level-2-3-val"},
-                  [:level-1-1 :level-2-1 :level-3-2] {:type :diff-as-list.core/map},
-                  [:level-1-1 :level-2-1 :level-3-2 :level-4-1]
-                  {:type :diff-as-list.core/primitive, :value "level-4-1-val"}}]
-    ;; (pp/pprint actual)
-    (test/is (= actual expected))))
+(defrecord KeyMissingDiff [type path value missing-in])
+(defn make-key-missing-diff [key-missing-diff-in]
+  (-> key-missing-diff-in
+      (assoc :type ::KeyMissingDiff)
+      map->KeyMissingDiff))
 
-(test/deftest ttf-2
-  (let [actual (traverse-to-flat  {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
-                                                           :level-3-2 nil
-                                                           }
-                                               :level-2-2 "level-2-2-val"
-                                               :level-2-3 "level-2-3-val"}
-                                   :level-1-2 "level-1-2-val"})
-        expected {[] {:type :diff-as-list.core/map},
-                  [:level-1-1] {:type :diff-as-list.core/map},
-                  [:level-1-1 :level-2-1] {:type :diff-as-list.core/map},
-                  [:level-1-1 :level-2-1 :level-3-1]
-                  {:type :diff-as-list.core/primitive, :value "level-3-1-val"},
-                  [:level-1-2]
-                  {:type :diff-as-list.core/primitive, :value "level-1-2-val"},
-                  [:level-1-1 :level-2-2]
-                  {:type :diff-as-list.core/primitive, :value "level-2-2-val"},
-                  [:level-1-1 :level-2-3]
-                  {:type :diff-as-list.core/primitive, :value "level-2-3-val"},
-                  [:level-1-1 :level-2-1 :level-3-2]
-                  {:type :diff-as-list.core/primitive, :value nil}}]
-    ;; (pp/pprint actual)
-    (test/is (= actual expected))))
+(defrecord ValueDiff [type path val-1 val-2])
+(defn make-value-diff [value-diff-in]
+  (-> value-diff-in
+      (assoc :type ::ValueDiff)
+      map->ValueDiff))
+
+(defn diff-map->record [diff-item]
+  (case (:type diff-item)
+    ::ValueDiff
+    (make-value-diff diff-item)
+    ::KeyMissingDiff
+    (make-key-missing-diff diff-item)
+    (throw (RuntimeException. "should not be here"))))
 
 
 (defn diffl [arg-1 arg-2]
@@ -120,7 +88,7 @@
                                  (when-not (or both-are-maps?
                                                (and both-are-prims?
                                                     (= value-1 value-2)))
-                                   {:path _key :val-1 value-1 :val-2 value-2})))
+                                   (make-value-diff {:path _key :val-1 value-1 :val-2 value-2}))))
         value-diffs (as-> keys-in-both $
                       (map #(keys-in-both-compare %) $)
                       (remove nil? $)
@@ -146,85 +114,19 @@
         keys-missing-in-2 (as-> (_set/difference keys-in-1 keys-in-2) $
                             (remove is-missing-path-in-diffs? $)
                             (remove-redundants $)
-                            (map #(hash-map :path % :value (get-in arg-1 %)) $)
+                            (map #(make-key-missing-diff {:path %
+                                                          :value (get-in arg-1 %)
+                                                          :missing-in :two}) $)
                             (vec $))
         keys-missing-in-1 (as-> (_set/difference keys-in-2 keys-in-1) $
                             (remove is-missing-path-in-diffs? $)
                             (remove-redundants $)
-                            (map #(hash-map :path % :value (get-in arg-2 %)) $)
+                            (map #(make-key-missing-diff {:path %
+                                                          :value (get-in arg-2 %)
+                                                          :missing-in :one}) $)
                             (vec $))]
-    {:keys-missing-in-1 keys-missing-in-1
-     :keys-missing-in-2 keys-missing-in-2
-     :value-differences value-diffs
-     :dal-version version}))
-
-;; (defn- map-is-same? [map1 map2]
-;;   (let [the-diff (diff map1 map2)]
-;;     (and (nil? (first the-diff)) (nil? (nth the-diff 1)))))
-
-
-
-(test/deftest initial
-  (let [expected {:keys-missing-in-1 [],
-                  :keys-missing-in-2 [],
-                  :value-differences [{:path [:what], :val-1 "nothing", :val-2 "who"}]}
-        actual (-> (diffl {:what "nothing"} {:what "who"})
-                   (dissoc :dal-version))]
-    (test/is (= expected actual))))
-
-
-(test/deftest nil-arg
-  (let [expected {:keys-missing-in-1 [],
-                  :keys-missing-in-2 [],
-                  :value-differences [{:path [:what], :val-1 nil, :val-2 {:who "why"}}]}
-        actual (-> (diffl {:what nil} {:what {:who "why"}})
-                   (dissoc :dal-version))]
-    (test/is (= expected actual))))
-
-(test/deftest missing-key
-  (let [map-1 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"
-                                       :level-3-2 {:level-4-1 "level-4-1-val"}}
-                           :level-2-2 "level-2-2-val"
-                           :level-2-3 "level-2-3-val"}
-               :level-1-2 "level-1-2-val"}
-        map-2 {:level-1-1 {:level-2-1 {:level-3-1 "level-3-1-val"}
-                             :level-2-2 "level-2-2-val"
-                             :level-2-3 "level-2-3-val"}
-               :level-1-2 "level-1-2-val"}
-        expected {:keys-missing-in-1 [],
-                  :keys-missing-in-2 [
-                                      {:path [:level-1-1 :level-2-1 :level-3-2]
-                                       :value {:level-4-1 "level-4-1-val"}}],
-                  :value-differences []}
-        actual (-> (diffl map-1 map-2)
-                   (dissoc :dal-version))]
-    ;; (pp/pprint actual)
-    (test/is (= expected actual))))
-
-(test/deftest remove-redundant
-  (let [map-1 {:question-section
-               {:name "question-section",
-                :fields {:text {:name "text", :type :character, :max-length 200}}}}
-        map-2 {:question-section
-               {:name "question-section",
-                :fields
-                {:text {:name "text", :type :character, :max-length 200},
-                 :bogus {:name "bogus", :type :integer},
-                 :what {:name "what", :type :djunk}}}}
-        expected {:keys-missing-in-1
-                  [{:path [:question-section :fields :bogus],
-                    :value {:name "bogus", :type :integer}}
-                   {:path [:question-section :fields :what],
-                    :value {:name "what", :type :djunk}}],
-                  :keys-missing-in-2 [],
-                  :value-differences []}
-        actual (-> (diffl map-1 map-2)
-                   (dissoc :dal-version))]
-    ;; (println "\nexpected:")
-    ;; (pp/pprint expected)
-    ;; (println "\n:actual:")
-    ;; (pp/pprint actual)
-    (test/is (= expected actual))))
+    {:dal-version version
+     :differences (into [] (concat value-diffs keys-missing-in-1 keys-missing-in-2))}))
 
 
 
@@ -233,86 +135,22 @@
 
 
 (defn patch [orig-map _diff]
-  (let [apply-value-diff (fn [accum value-diff]
-                           (let [new-val (:val-2 value-diff)]
-                             (if (nil? accum)
-                               new-val
-                               (assoc-in accum (:path value-diff) new-val))))
-        remove-key (fn [accum removed-key]
-                     (let [removed-key-path (:path removed-key)]
-                       (if (<= (count removed-key-path) 1)
-                         (dissoc accum (first removed-key-path))
-                         (update-in accum (drop-last removed-key-path) dissoc (last removed-key-path)))))
-        add-key (fn [accum added-key]
-                  (assoc-in accum (:path added-key) (:value added-key)))]
-    (as-> orig-map $
-      ;; (if (nil? $) {} $)
-      (reduce apply-value-diff $ (:value-differences _diff))
-      (reduce remove-key $ (:keys-missing-in-2 _diff))
-      (reduce add-key $ (:keys-missing-in-1 _diff))
-      )))
-
-
-
-
-
-(test/deftest patch-initial
-  (let [orig-map {:what "nothing"}
-        _diff {:keys-missing-in-1 [],
-               :keys-missing-in-2 [],
-               :value-differences [{:path [:what], :val-1 "nothing", :val-2 "who"}]}
-        expected {:what "who"}
-        actual (patch orig-map _diff)]
-    ;; (pp/pprint actual)
-    (test/is (= expected actual))))
-
-(test/deftest patch-nil-arg
-  (let [orig-map {:what nil}
-        _diff {:keys-missing-in-1 [],
-               :keys-missing-in-2 [],
-               :value-differences [{:path [:what], :val-1 nil, :val-2 {:who "why"}}]}
-        expected {:what {:who "why"}}
-        actual (patch orig-map _diff)]
-    (test/is (= expected actual))))
-
-
-(test/deftest patch-key-removed
-  (let [orig-map {:what "one"
-                  :who "two"}
-        _diff {:keys-missing-in-1 []
-               :keys-missing-in-2 [{:path [:who] :value "two"}]
-               :value-differences []}
-        expected {:what "one"}
-        actual (patch orig-map _diff)]
-    (test/is (= expected actual))))
-
-(test/deftest patch-key-removed-nested
-  (let [orig-map {:what {:why "who"}}
-        _diff {:keys-missing-in-1 []
-               :keys-missing-in-2 [{:path [:what :why] :value "who"}]
-               :value-differences []}
-        expected {:what {}}
-        actual (patch orig-map _diff)
-        ]
-    (test/is (= expected actual))))
-
-
-;; (def/deftest patch-added-key) !!!!!!
-(test/deftest patch-key-added
-  (let [orig-map {:what {}}
-        _diff {:keys-missing-in-1 [{:path [:what :why] :value "who"}]
-               :keys-missing-in-2 []
-               :value-differences []}
-        expected {:what {:why "who"}}
-        actual (patch orig-map _diff)]
-    (test/is (= expected actual))))
-
-
-(test/deftest patch-nil-to-value
-  (let [orig-map nil
-        _diff {:keys-missing-in-1 (), :keys-missing-in-2 (),
-               :value-differences [{:path [], :val-1 nil, :val-2 {:what "who"}}]}
-        expected {:what "who"}
-        actual (patch orig-map _diff)
-        ]
-    (test/is (= expected actual))))
+  (let [patch-reducing-fn
+        (fn [accum single-diff]
+          (cond
+            (instance? ValueDiff single-diff)
+            (let [new-val (:val-2 single-diff)]
+              (if (nil? accum)
+                new-val
+                (assoc-in accum (:path single-diff) new-val)))
+            (and (instance? KeyMissingDiff single-diff)
+                 (= (:missing-in single-diff) :one))
+            (assoc-in accum (:path single-diff) (:value single-diff))
+            (and (instance? KeyMissingDiff single-diff)
+                 (= (:missing-in single-diff) :two))
+            (let [removed-key-path (:path single-diff)]
+              (if (<= (count removed-key-path) 1)
+                (dissoc accum (first removed-key-path))
+                (update-in accum (drop-last removed-key-path) dissoc (last removed-key-path))))
+            :else (throw (RuntimeException. "should not be here"))))]
+    (reduce patch-reducing-fn orig-map (:differences _diff))))
