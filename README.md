@@ -24,12 +24,16 @@ The original version worked with sequences, and the user had to provide a mappin
 
 When bumping version be sure to change it in `project.clj` and the `(def version "x.x.x")` at the top of `core.clj`
 
-- `$ git commit -a -m "commit msg"`
+- `$ git commit -am "commit msg"`
 - `$ git push`
 - `$ git tag -a vx.x.x -m "description of version"`
 - `$ git push --tags`
 - `$ lein deploy clojars`
 - create a release from the tag in github
+
+### lein deploy setup notes
+
+- instructions [here](https://github.com/technomancy/leiningen/blob/master/doc/DEPLOY.md)
 
 ## License
 

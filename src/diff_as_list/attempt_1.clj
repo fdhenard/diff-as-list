@@ -6,14 +6,14 @@
             [clojure.data :refer [diff]]
             [clojure.zip :as zip]))
 
-(defn- is-primitive? [val]
+(defn- is-scalar? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword"} (.getName (type val))))
 
-(deftest primitive
-  (is (= true (is-primitive? "test")))
-  (is (is-primitive? 1))
-  (is (not (is-primitive? {})))
-  (is (not (is-primitive? []))))
+(deftest scalar
+  (is (= true (is-scalar? "test")))
+  (is (is-scalar? 1))
+  (is (not (is-scalar? {})))
+  (is (not (is-scalar? []))))
 
 (defn- is-func? [obj]
   (= (.getName (type obj)) "clojure.lang.Fn"))
@@ -65,7 +65,7 @@
                                     [])]
            (flatten (into initial-difference
                           (map #(diffl (% arg-1) (% arg-2) depth-ident-funcs (conj keypath %) (conj keypath-w-id %)) keys-in-both))))
-         (is-primitive? arg-1)
+         (is-scalar? arg-1)
          (if (not (= arg-1 arg-2))
            (do
              ;; (println (format "diff found at %s: 1 = %s; 2 = %s" keypath arg-1 arg-2))

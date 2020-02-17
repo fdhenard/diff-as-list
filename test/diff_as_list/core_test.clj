@@ -2,11 +2,11 @@
   (:require [clojure.test :refer :all]
             [diff-as-list.core :refer :all]))
 
-(deftest primitive
-  (is (= true (is-primitive? "test")))
-  (is (is-primitive? 1))
-  (is (not (is-primitive? {})))
-  (is (not (is-primitive? []))))
+(deftest scalar
+  (is (= true (is-scalar? "test")))
+  (is (is-scalar? 1))
+  (is (not (is-scalar? {})))
+  (is (not (is-scalar? []))))
 
 
 (deftest ttf-1
@@ -19,16 +19,16 @@
                   [:level-1-1] {:type :diff-as-list.core/map},
                   [:level-1-1 :level-2-1] {:type :diff-as-list.core/map},
                   [:level-1-1 :level-2-1 :level-3-1]
-                  {:type :diff-as-list.core/primitive, :value "level-3-1-val"},
+                  {:type :diff-as-list.core/scalar, :value "level-3-1-val"},
                   [:level-1-2]
-                  {:type :diff-as-list.core/primitive, :value "level-1-2-val"},
+                  {:type :diff-as-list.core/scalar, :value "level-1-2-val"},
                   [:level-1-1 :level-2-2]
-                  {:type :diff-as-list.core/primitive, :value "level-2-2-val"},
+                  {:type :diff-as-list.core/scalar, :value "level-2-2-val"},
                   [:level-1-1 :level-2-3]
-                  {:type :diff-as-list.core/primitive, :value "level-2-3-val"},
+                  {:type :diff-as-list.core/scalar, :value "level-2-3-val"},
                   [:level-1-1 :level-2-1 :level-3-2] {:type :diff-as-list.core/map},
                   [:level-1-1 :level-2-1 :level-3-2 :level-4-1]
-                  {:type :diff-as-list.core/primitive, :value "level-4-1-val"}}]
+                  {:type :diff-as-list.core/scalar, :value "level-4-1-val"}}]
     ;; (pp/pprint actual)
     (is (= actual expected))))
 
@@ -43,15 +43,15 @@
                   [:level-1-1] {:type :diff-as-list.core/map},
                   [:level-1-1 :level-2-1] {:type :diff-as-list.core/map},
                   [:level-1-1 :level-2-1 :level-3-1]
-                  {:type :diff-as-list.core/primitive, :value "level-3-1-val"},
+                  {:type :diff-as-list.core/scalar, :value "level-3-1-val"},
                   [:level-1-2]
-                  {:type :diff-as-list.core/primitive, :value "level-1-2-val"},
+                  {:type :diff-as-list.core/scalar, :value "level-1-2-val"},
                   [:level-1-1 :level-2-2]
-                  {:type :diff-as-list.core/primitive, :value "level-2-2-val"},
+                  {:type :diff-as-list.core/scalar, :value "level-2-2-val"},
                   [:level-1-1 :level-2-3]
-                  {:type :diff-as-list.core/primitive, :value "level-2-3-val"},
+                  {:type :diff-as-list.core/scalar, :value "level-2-3-val"},
                   [:level-1-1 :level-2-1 :level-3-2]
-                  {:type :diff-as-list.core/primitive, :value nil}}]
+                  {:type :diff-as-list.core/scalar, :value nil}}]
     ;; (pp/pprint actual)
     (is (= actual expected))))
 

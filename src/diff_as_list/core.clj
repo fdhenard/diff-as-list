@@ -6,9 +6,9 @@
             [clojure.test :as test]
             [clojure.string :as str]))
 
-(def version "3.0.0")
+(def version "3.0.1")
 
-(defn is-primitive? [val]
+(defn is-scalar? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword" "java.lang.Boolean"} (.getName (type val))))
 
 
@@ -23,13 +23,13 @@
      result
      (let [value (get-in in-val in-path ::no-value)]
        (cond
-         (or (nil? value) (is-primitive? value))
+         (or (nil? value) (is-scalar? value))
          (do
            ;; below assoces result into a map
            (recur in-val
                   (rest remaining-traversal)
                   (first remaining-traversal)
-                  (assoc result in-path {:type ::primitive :value value})))
+                  (assoc result in-path {:type ::scalar :value value})))
          (map? value)
          (let [_keys (keys value)
                first-key (first _keys)
@@ -83,8 +83,8 @@
                                                           (:type $))
                                      both-are-maps? (and (= ::map val-1-map-or-prim)
                                                          (= ::map val-2-map-or-prim))
-                                     both-are-prims? (and (= ::primitive val-1-map-or-prim)
-                                                          (= ::primitive val-2-map-or-prim))]
+                                     both-are-prims? (and (= ::scalar val-1-map-or-prim)
+                                                          (= ::scalar val-2-map-or-prim))]
                                  (when-not (or both-are-maps?
                                                (and both-are-prims?
                                                     (= value-1 value-2)))
