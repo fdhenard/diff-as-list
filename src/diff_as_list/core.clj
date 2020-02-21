@@ -6,7 +6,7 @@
             [clojure.test :as test]
             [clojure.string :as str]))
 
-(def version "3.0.1")
+(def version "3.0.2")
 
 (defn is-scalar? [val]
   (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword" "java.lang.Boolean"} (.getName (type val))))
@@ -137,20 +137,26 @@
 (defn patch [orig-map _diff]
   (let [patch-reducing-fn
         (fn [accum single-diff]
-          (cond
-            (instance? ValueDiff single-diff)
-            (let [new-val (:val-2 single-diff)]
-              (if (nil? accum)
-                new-val
-                (assoc-in accum (:path single-diff) new-val)))
-            (and (instance? KeyMissingDiff single-diff)
-                 (= (:missing-in single-diff) :one))
-            (assoc-in accum (:path single-diff) (:value single-diff))
-            (and (instance? KeyMissingDiff single-diff)
-                 (= (:missing-in single-diff) :two))
-            (let [removed-key-path (:path single-diff)]
-              (if (<= (count removed-key-path) 1)
-                (dissoc accum (first removed-key-path))
-                (update-in accum (drop-last removed-key-path) dissoc (last removed-key-path))))
-            :else (throw (RuntimeException. "should not be here"))))]
-    (reduce patch-reducing-fn orig-map (:differences _diff))))
+          (let [#_ (clojure.pprint/pprint {:accum accum
+                                          :single-diff single-diff})]
+           (cond
+             (instance? ValueDiff single-diff)
+             (let [new-val (:val-2 single-diff)]
+               (if (nil? accum)
+                 new-val
+                 (assoc-in accum (:path single-diff) new-val)))
+             (and (instance? KeyMissingDiff single-diff)
+                  (= (:missing-in single-diff) :one))
+             (assoc-in accum (:path single-diff) (:value single-diff))
+             (and (instance? KeyMissingDiff single-diff)
+                  (= (:missing-in single-diff) :two))
+             (let [removed-key-path (:path single-diff)]
+               (if (<= (count removed-key-path) 1)
+                 (dissoc accum (first removed-key-path))
+                 (update-in accum (drop-last removed-key-path) dissoc (last removed-key-path))))
+             :else (throw (RuntimeException. "should not be here")))))
+        differences (map #(if (record? %)
+                            %
+                            (diff-map->record %))
+                         (:differences _diff))]
+    (reduce patch-reducing-fn orig-map differences)))
