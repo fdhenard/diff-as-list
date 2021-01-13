@@ -5,9 +5,11 @@
 (def version "3.0.2")
 
 (defn is-scalar? [val]
-  (contains? #{"java.lang.String" "java.lang.Long"
-               "clojure.lang.Keyword" "java.lang.Boolean"}
-             (-> val type .getName)))
+  (contains? #{java.lang.String
+               java.lang.Long
+               clojure.lang.Keyword
+               java.lang.Boolean}
+             (type val)))
 
 
 (defn traverse-to-flat
