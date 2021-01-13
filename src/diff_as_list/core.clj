@@ -86,10 +86,10 @@
 
 (defn make-value-differences [{:keys [arg-1-paths arg-2-paths] :as diffl-ctx}]
   (let [keys-in-both (_set/intersection arg-1-paths arg-2-paths)]
-   (->> keys-in-both
-        (map #(path->value-diff diffl-ctx %))
-        (remove nil?)
-        vec)))
+    (->> keys-in-both
+         (map #(path->value-diff diffl-ctx %))
+         (remove nil?)
+         vec)))
 
 (defn is-path-child-of-other-path? [path-1 path-2]
   (let [path-2-length (count path-2)
