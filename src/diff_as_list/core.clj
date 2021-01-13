@@ -129,29 +129,27 @@
 
 
 
-(defn patch [orig-map _diff]
+(defn patch [orig-map {:keys [differences] :as _diff}]
   (let [patch-reducing-fn
-        (fn [accum single-diff]
-          (let [#_ (clojure.pprint/pprint {:accum accum
-                                          :single-diff single-diff})]
-           (cond
-             (instance? ValueDiff single-diff)
-             (let [new-val (:val-2 single-diff)]
-               (if-not accum
-                 new-val
-                 (assoc-in accum (:path single-diff) new-val)))
-             (and (instance? KeyMissingDiff single-diff)
-                  (= (:missing-in single-diff) :one))
-             (assoc-in accum (:path single-diff) (:value single-diff))
-             (and (instance? KeyMissingDiff single-diff)
-                  (= (:missing-in single-diff) :two))
-             (let [removed-key-path (:path single-diff)]
-               (if (<= (count removed-key-path) 1)
-                 (dissoc accum (first removed-key-path))
-                 (update-in accum (drop-last removed-key-path) dissoc (last removed-key-path))))
-             :else (throw (RuntimeException. "should not be here")))))
+        (fn [accum {:keys [val-2 path missing-in value] :as single-diff}]
+          (cond
+            (instance? ValueDiff single-diff)
+            (let [new-val val-2]
+              (if-not accum
+                new-val
+                (assoc-in accum path new-val)))
+            (and (instance? KeyMissingDiff single-diff)
+                 (= missing-in :one))
+            (assoc-in accum path value)
+            (and (instance? KeyMissingDiff single-diff)
+                 (= missing-in :two))
+            (let [removed-key-path path]
+              (if (<= (count removed-key-path) 1)
+                (dissoc accum (first removed-key-path))
+                (update-in accum (drop-last removed-key-path) dissoc (last removed-key-path))))
+            :else (throw (RuntimeException. "should not be here"))))
         differences (map #(if (record? %)
                             %
                             (diff-map->record %))
-                         (:differences _diff))]
+                         differences)]
     (reduce patch-reducing-fn orig-map differences)))
