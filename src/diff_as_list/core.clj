@@ -62,14 +62,75 @@
     (make-key-missing-diff diff-item)
     (throw (RuntimeException. "should not be here"))))
 
+(defn path->value-diff [{:keys [arg-1
+                                arg-2
+                                arg-1-flat
+                                arg-2-flat]}
+                        path]
+  (let [value-1 (get-in arg-1 path ::not-found)
+        val-1-map-or-prim (-> arg-1-flat
+                              (get path)
+                              :type)
+        value-2 (get-in arg-2 path ::not-found)
+        val-2-map-or-prim (-> arg-2-flat
+                              (get path)
+                              :type)
+        both-are-maps? (and (= ::map val-1-map-or-prim)
+                            (= ::map val-2-map-or-prim))
+        both-are-prims? (and (= ::scalar val-1-map-or-prim)
+                             (= ::scalar val-2-map-or-prim))]
+    (when-not (or both-are-maps?
+                  (and both-are-prims?
+                       (= value-1 value-2)))
+      (make-value-diff {:path path :val-1 value-1 :val-2 value-2}))))
+
+(defn make-value-differences [{:keys [arg-1-keys arg-2-keys] :as diffl-ctx}]
+  (let [keys-in-both (_set/intersection arg-1-keys arg-2-keys)]
+   (->> keys-in-both
+        (map #(path->value-diff diffl-ctx %))
+        (remove nil?)
+        vec)))
+
+(defn is-path-child-of-other-path? [path-1 path-2]
+  (let [path-2-length (count path-2)
+        path-1-length (count path-1)]
+    (and (>= path-1-length path-2-length)
+         (let [path-1-shortened (take path-2-length path-1)]
+           (= path-2 path-1-shortened)))))
+
+(defn remove-redundants [keys-missing]
+  (let [sorted-by-length (sort-by count keys-missing)]
+    (reduce
+     (fn [accum key-path]
+       (if (some #(is-path-child-of-other-path? key-path %) accum)
+         accum
+         (conj accum key-path)))
+     []
+     sorted-by-length)))
+
+(defn is-missing-path-in-diffs? [{:keys [value-diffs]} missing-path]
+  (let [value-diff-paths (map :path value-diffs)]
+    (some #(is-path-child-of-other-path? missing-path %)
+          value-diff-paths)))
+
 
 (defn diffl [arg-1 arg-2]
-  (let [flattened-1 (traverse-to-flat arg-1)
-        flattened-2 (traverse-to-flat arg-2)
-        keys-in-1 (set (keys flattened-1))
-        keys-in-2 (set (keys flattened-2))
-        keys-in-both (_set/intersection keys-in-1 keys-in-2)
-        keys-in-both-compare
+  (let [
+
+        arg-1-flat (traverse-to-flat arg-1)
+        arg-2-flat (traverse-to-flat arg-2)
+        arg-1-keys (-> arg-1-flat keys set)
+        arg-2-keys (-> arg-2-flat keys set)
+        #_#_keys-in-both (_set/intersection arg-1-keys arg-2-keys)
+        diffl-ctx {:arg-1 arg-1
+                   :arg-2 arg-2
+                   :arg-1-flat arg-1-flat
+                   :arg-2-flat arg-2-flat
+                   :arg-1-keys arg-1-keys
+                   :arg-2-keys arg-2-keys
+                   ;; :arg-1-keys
+                   }
+        #_#_path->value-diff
         (fn [_key]
           (let [value-1 (get-in arg-1 _key ::not-found)
                 val-1-map-or-prim (-> flattened-1
@@ -87,23 +148,21 @@
                           (and both-are-prims?
                                (= value-1 value-2)))
               (make-value-diff {:path _key :val-1 value-1 :val-2 value-2}))))
-        value-diffs (->> keys-in-both
-                         (map keys-in-both-compare)
-                         (remove nil?)
-                         vec)
-        value-diff-paths (map :path value-diffs)
-        is-path-child-of-other-path?
+        value-diffs (make-value-differences diffl-ctx)
+        diffl-ctx (assoc diffl-ctx :value-diffs value-diffs)
+        #_#_ value-diff-paths (map :path value-diffs)
+        #_#_is-path-child-of-other-path?
         (fn [path-1 path-2]
           (let [path-2-length (count path-2)
                 path-1-length (count path-1)]
             (and (>= path-1-length path-2-length)
                  (let [path-1-shortened (take path-2-length path-1)]
                    (= path-2 path-1-shortened)))))
-        is-missing-path-in-diffs?
+        #_#_is-missing-path-in-diffs?
         (fn [missing-path]
           (some #(is-path-child-of-other-path? missing-path %)
                 value-diff-paths))
-        remove-redundants
+        #_#_remove-redundants
         (fn [keys-missing]
           (let [sorted-by-length (sort-by count keys-missing)]
             (reduce
@@ -114,16 +173,16 @@
              []
              sorted-by-length)))
         keys-missing-in-2
-        (->> (_set/difference keys-in-1 keys-in-2)
-             (remove is-missing-path-in-diffs?)
+        (->> (_set/difference arg-1-keys arg-2-keys)
+             (remove #(is-missing-path-in-diffs? diffl-ctx %))
              remove-redundants
              (map #(make-key-missing-diff {:path %
                                            :value (get-in arg-1 %)
                                            :missing-in :two}))
              vec)
         keys-missing-in-1
-        (->> (_set/difference keys-in-2 keys-in-1)
-             (remove is-missing-path-in-diffs?)
+        (->> (_set/difference arg-2-keys arg-1-keys)
+             (remove #(is-missing-path-in-diffs? diffl-ctx %))
              remove-redundants
              (map #(make-key-missing-diff {:path %
                                            :value (get-in arg-2 %)
