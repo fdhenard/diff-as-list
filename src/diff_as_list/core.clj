@@ -7,7 +7,7 @@
 (defn is-scalar? [val]
   (contains? #{"java.lang.String" "java.lang.Long"
                "clojure.lang.Keyword" "java.lang.Boolean"}
-             (.getName (type val))))
+             (-> val type .getName)))
 
 
 (defn traverse-to-flat
