@@ -5,7 +5,9 @@
 (def version "3.0.2")
 
 (defn is-scalar? [val]
-  (contains? #{"java.lang.String" "java.lang.Long" "clojure.lang.Keyword" "java.lang.Boolean"} (.getName (type val))))
+  (contains? #{"java.lang.String" "java.lang.Long"
+               "clojure.lang.Keyword" "java.lang.Boolean"}
+             (.getName (type val))))
 
 
 (defn traverse-to-flat
@@ -67,61 +69,70 @@
         keys-in-1 (set (keys flattened-1))
         keys-in-2 (set (keys flattened-2))
         keys-in-both (_set/intersection keys-in-1 keys-in-2)
-        keys-in-both-compare (fn [_key]
-                               (let [value-1 (get-in arg-1 _key ::not-found)
-                                     val-1-map-or-prim (-> flattened-1
-                                                           (get _key)
-                                                           :type)
-                                     value-2 (get-in arg-2 _key ::not-found)
-                                     val-2-map-or-prim (-> flattened-2
-                                                           (get _key)
-                                                           :type)
-                                     both-are-maps? (and (= ::map val-1-map-or-prim)
-                                                         (= ::map val-2-map-or-prim))
-                                     both-are-prims? (and (= ::scalar val-1-map-or-prim)
-                                                          (= ::scalar val-2-map-or-prim))]
-                                 (when-not (or both-are-maps?
-                                               (and both-are-prims?
-                                                    (= value-1 value-2)))
-                                   (make-value-diff {:path _key :val-1 value-1 :val-2 value-2}))))
+        keys-in-both-compare
+        (fn [_key]
+          (let [value-1 (get-in arg-1 _key ::not-found)
+                val-1-map-or-prim (-> flattened-1
+                                      (get _key)
+                                      :type)
+                value-2 (get-in arg-2 _key ::not-found)
+                val-2-map-or-prim (-> flattened-2
+                                      (get _key)
+                                      :type)
+                both-are-maps? (and (= ::map val-1-map-or-prim)
+                                    (= ::map val-2-map-or-prim))
+                both-are-prims? (and (= ::scalar val-1-map-or-prim)
+                                     (= ::scalar val-2-map-or-prim))]
+            (when-not (or both-are-maps?
+                          (and both-are-prims?
+                               (= value-1 value-2)))
+              (make-value-diff {:path _key :val-1 value-1 :val-2 value-2}))))
         value-diffs (->> keys-in-both
                          (map keys-in-both-compare)
                          (remove nil?)
                          vec)
         value-diff-paths (map :path value-diffs)
-        is-path-child-of-other-path? (fn [path-1 path-2]
-                                       (let [path-2-length (count path-2)
-                                             path-1-length (count path-1)]
-                                         (and (>= path-1-length path-2-length)
-                                              (let [path-1-shortened (take path-2-length path-1)]
-                                                (= path-2 path-1-shortened)))))
-        is-missing-path-in-diffs? (fn [missing-path]
-                                    (some #(is-path-child-of-other-path? missing-path %) value-diff-paths))
-        remove-redundants (fn [keys-missing]
-                            (let [sorted-by-length (sort-by count keys-missing)]
-                              (reduce
-                               (fn [accum key-path]
-                                 (if (some #(is-path-child-of-other-path? key-path %) accum)
-                                   accum
-                                   (conj accum key-path)))
-                               []
-                               sorted-by-length)))
-        keys-missing-in-2 (->> (_set/difference keys-in-1 keys-in-2)
-                               (remove is-missing-path-in-diffs?)
-                               remove-redundants
-                               (map #(make-key-missing-diff {:path %
-                                                             :value (get-in arg-1 %)
-                                                             :missing-in :two}))
-                               vec)
-        keys-missing-in-1 (->> (_set/difference keys-in-2 keys-in-1)
-                               (remove is-missing-path-in-diffs?)
-                               remove-redundants
-                               (map #(make-key-missing-diff {:path %
-                                                             :value (get-in arg-2 %)
-                                                             :missing-in :one}))
-                               vec)]
+        is-path-child-of-other-path?
+        (fn [path-1 path-2]
+          (let [path-2-length (count path-2)
+                path-1-length (count path-1)]
+            (and (>= path-1-length path-2-length)
+                 (let [path-1-shortened (take path-2-length path-1)]
+                   (= path-2 path-1-shortened)))))
+        is-missing-path-in-diffs?
+        (fn [missing-path]
+          (some #(is-path-child-of-other-path? missing-path %)
+                value-diff-paths))
+        remove-redundants
+        (fn [keys-missing]
+          (let [sorted-by-length (sort-by count keys-missing)]
+            (reduce
+             (fn [accum key-path]
+               (if (some #(is-path-child-of-other-path? key-path %) accum)
+                 accum
+                 (conj accum key-path)))
+             []
+             sorted-by-length)))
+        keys-missing-in-2
+        (->> (_set/difference keys-in-1 keys-in-2)
+             (remove is-missing-path-in-diffs?)
+             remove-redundants
+             (map #(make-key-missing-diff {:path %
+                                           :value (get-in arg-1 %)
+                                           :missing-in :two}))
+             vec)
+        keys-missing-in-1
+        (->> (_set/difference keys-in-2 keys-in-1)
+             (remove is-missing-path-in-diffs?)
+             remove-redundants
+             (map #(make-key-missing-diff {:path %
+                                           :value (get-in arg-2 %)
+                                           :missing-in :one}))
+             vec)]
     {:dal-version version
-     :differences (into [] (concat value-diffs keys-missing-in-1 keys-missing-in-2))}))
+     :differences (into [] (concat value-diffs
+                                   keys-missing-in-1
+                                   keys-missing-in-2))}))
 
 
 
@@ -146,7 +157,10 @@
             (let [removed-key-path path]
               (if (<= (count removed-key-path) 1)
                 (dissoc accum (first removed-key-path))
-                (update-in accum (drop-last removed-key-path) dissoc (last removed-key-path))))
+                (update-in accum
+                           (drop-last removed-key-path)
+                           dissoc
+                           (last removed-key-path))))
             :else (throw (RuntimeException. "should not be here"))))
         differences (map #(if (record? %)
                             %
